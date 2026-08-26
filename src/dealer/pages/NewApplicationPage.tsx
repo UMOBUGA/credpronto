@@ -17,6 +17,7 @@ interface FormState {
   vehicleModel: string
   vehicleYear: number
   vehiclePrice: number
+  vehiclePlate: string
   downPayment: number
   requestedAmount: number
   requestedTermMonths: number
@@ -31,6 +32,7 @@ const INITIAL_FORM: FormState = {
   vehicleModel: '',
   vehicleYear: new Date().getFullYear(),
   vehiclePrice: 0,
+  vehiclePlate: '',
   downPayment: 0,
   requestedAmount: 0,
   requestedTermMonths: 36,
@@ -56,6 +58,7 @@ export default function NewApplicationPage() {
           vehicleModel: form.vehicleModel,
           vehicleYear: Number(form.vehicleYear),
           vehiclePrice: Number(form.vehiclePrice),
+          vehiclePlate: form.vehiclePlate,
           downPayment: Number(form.downPayment),
           requestedAmount: Number(form.requestedAmount),
           requestedTermMonths: Number(form.requestedTermMonths),
@@ -142,6 +145,14 @@ export default function NewApplicationPage() {
               type="number"
               value={form.vehiclePrice}
               onChange={(e) => set('vehiclePrice', Number(e.target.value))}
+              required
+            />
+          </label>
+          <label>
+            Placa
+            <input
+              value={form.vehiclePlate}
+              onChange={(e) => set('vehiclePlate', e.target.value.toUpperCase())}
               required
             />
           </label>

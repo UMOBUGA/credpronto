@@ -54,7 +54,7 @@ export default function ApplicationDetailPage() {
   return (
     <div className="page">
       <h1>
-        {data.vehicleMake} {data.vehicleModel} ({data.vehicleYear})
+        {data.vehicleMake} {data.vehicleModel} ({data.vehicleYear}) — {data.vehiclePlate}
       </h1>
       <span className={`status-badge status-${data.status}`}>{STATUS_LABELS[data.status]}</span>
 
@@ -111,6 +111,47 @@ export default function ApplicationDetailPage() {
         </section>
       )}
 
+      {data.latestVehicleCheck && (
+        <section className="detail-section">
+          <h2>Consulta veicular</h2>
+          <p>
+            {data.latestVehicleCheck.fipeValue != null ? (
+              <>
+                Valor FIPE: {formatCurrency(data.latestVehicleCheck.fipeValue)}
+                {data.latestVehicleCheck.fipeBrand && data.latestVehicleCheck.fipeModel && (
+                  <>
+                    {' '}
+                    ({data.latestVehicleCheck.fipeBrand} {data.latestVehicleCheck.fipeModel})
+                  </>
+                )}
+              </>
+            ) : (
+              'Valor FIPE indisponível — marca/modelo não encontrado ou API fora do ar.'
+            )}
+          </p>
+          <p>
+            Restrição (roubo/furto/gravame, simulado):{' '}
+            {data.latestVehicleCheck.restrictionFound ? 'Encontrada' : 'Não encontrada'}
+          </p>
+        </section>
+      )}
+
+      {data.latestAntifraudCheck && (
+        <section className="detail-section">
+          <h2>Anti-fraude</h2>
+          <p>Score de risco: {data.latestAntifraudCheck.riskScore}/100</p>
+          {data.latestAntifraudCheck.flagsJson.length > 0 ? (
+            <ul>
+              {data.latestAntifraudCheck.flagsJson.map((flag) => (
+                <li key={flag}>{flag}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>Nenhum sinal de fraude encontrado.</p>
+          )}
+        </section>
+      )}
+
       {data.latestDecision && (
         <section className="detail-section">
           <h2>Decisão</h2>
@@ -122,9 +163,11 @@ export default function ApplicationDetailPage() {
       )}
 
       <section className="detail-section actions">
-        {data.status === 'client_submitted' && (
+        {(data.status === 'client_submitted' || data.status === 'documents_review_required') && (
           <button onClick={() => runBureauCheck.mutate()} disabled={runBureauCheck.isPending}>
-            {runBureauCheck.isPending ? 'Consultando…' : 'Rodar bureau (simulado)'}
+            {runBureauCheck.isPending
+              ? 'Consultando…'
+              : 'Rodar verificações (bureau, veículo, antifraude)'}
           </button>
         )}
         {data.status === 'running_checks' && (

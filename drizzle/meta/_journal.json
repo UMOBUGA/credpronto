@@ -15,6 +15,13 @@
       "when": 1787769329126,
       "tag": "0001_wandering_black_tom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787771781179,
+      "tag": "0002_nifty_lilith",
+      "breakpoints": true
     }
   ]
 }

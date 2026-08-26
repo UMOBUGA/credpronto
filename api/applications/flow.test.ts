@@ -20,23 +20,33 @@ import { createSessionToken, SESSION_COOKIE_NAME } from '../_lib/auth'
 import { mockReq, mockRes } from '../_lib/testHttp'
 
 /**
- * Exercita a esteira inteira ponta a ponta (Fases 0-2), chamando os
+ * Exercita a esteira inteira ponta a ponta (Fases 0-3), chamando os
  * handlers diretamente (sem servidor HTTP real) contra o mesmo PGlite em
  * memória. O SDK da Anthropic é mockado — nunca chama a API real em CI —
- * simulando uma extração de documento limpa e de alta confiança.
+ * simulando uma extração de documento limpa e de alta confiança. `fetch`
+ * global também é mockado pra nunca bater na BrasilAPI de verdade — a
+ * consulta FIPE degrada pra `null` (caminho real e testado, ver
+ * `fipe.test.ts` pra cobertura da cadeia de chamadas em si).
  */
 describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', () => {
-  const originalScenario = process.env.MOCK_BUREAU_SCENARIO
+  const originalBureauScenario = process.env.MOCK_BUREAU_SCENARIO
+  const originalVehicleScenario = process.env.MOCK_VEHICLE_SCENARIO
+  const originalAntifraudScenario = process.env.MOCK_ANTIFRAUD_SCENARIO
 
   beforeAll(() => {
-    // Força o bureau mock para "limpo": o teste verifica o fluxo da esteira,
-    // não a distribuição aleatória do mock — determinístico de propósito.
+    // Determinístico de propósito: o teste verifica o fluxo da esteira, não
+    // a distribuição aleatória dos mocks.
     process.env.MOCK_BUREAU_SCENARIO = 'clean'
+    process.env.MOCK_VEHICLE_SCENARIO = 'clean'
+    process.env.MOCK_ANTIFRAUD_SCENARIO = 'clean'
   })
   afterAll(() => {
-    process.env.MOCK_BUREAU_SCENARIO = originalScenario
+    process.env.MOCK_BUREAU_SCENARIO = originalBureauScenario
+    process.env.MOCK_VEHICLE_SCENARIO = originalVehicleScenario
+    process.env.MOCK_ANTIFRAUD_SCENARIO = originalAntifraudScenario
   })
   beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 } as Response))
     createMock.mockReset()
     createMock.mockResolvedValue({
       model: 'claude-opus-5',
@@ -76,6 +86,7 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
           vehicleModel: 'Argo',
           vehicleYear: 2022,
           vehiclePrice: 80000,
+          vehiclePlate: 'ABC1D23',
           downPayment: 10000,
           requestedAmount: 70000,
           requestedTermMonths: 48,
@@ -140,7 +151,15 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
       bureauRes,
     )
     expect(bureauRes.statusCode).toBe(201)
-    expect((bureauRes.body as { hasRestriction: boolean }).hasRestriction).toBe(false)
+    const bureauBody = bureauRes.body as {
+      bureauCheck: { hasRestriction: boolean }
+      vehicleCheck: { restrictionFound: boolean; fipeValue: number | null }
+      antifraudCheck: { riskScore: number; flagsJson: string[] }
+    }
+    expect(bureauBody.bureauCheck.hasRestriction).toBe(false)
+    expect(bureauBody.vehicleCheck.restrictionFound).toBe(false)
+    expect(bureauBody.vehicleCheck.fipeValue).toBeNull()
+    expect(bureauBody.antifraudCheck.flagsJson).toEqual([])
 
     const decisionRes = mockRes()
     await decisionHandler(
@@ -202,6 +221,7 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
           vehicleModel: 'Polo',
           vehicleYear: 2023,
           vehiclePrice: 90000,
+          vehiclePlate: 'XYZ9K87',
           downPayment: 15000,
           requestedAmount: 75000,
           requestedTermMonths: 36,

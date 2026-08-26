@@ -1,17 +1,22 @@
-import { desc, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '../_lib/db'
 import {
+  antifraudChecks,
   applicants,
   applications,
   bureauChecks,
-  documentExtractions,
   documents,
+  vehicleChecks,
 } from '../_lib/schema'
 import { decryptField } from '../_lib/crypto'
 import { requireDealerSession } from '../_lib/auth'
 import { transition } from '../_lib/stateMachine'
 import { checkBureauMock } from '../_lib/bureau'
+import { lookupFipeValue } from '../_lib/fipe'
+import { checkVehicleRestrictionMock } from '../_lib/vehicleRestriction'
+import { checkAntifraud } from '../_lib/antifraud'
+import { getLatestExtraction } from '../_lib/documentExtraction'
 import { readJsonBody, sendJson, type Handler } from '../_lib/http'
 
 const bodySchema = z.object({ applicationId: z.string().uuid() })
@@ -33,13 +38,7 @@ async function hasBlockingDocument(
 
   for (const doc of docs) {
     if (doc.status !== 'extracted') return true
-
-    const [latest] = await db
-      .select({ status: documentExtractions.status })
-      .from(documentExtractions)
-      .where(eq(documentExtractions.documentId, doc.id))
-      .orderBy(desc(documentExtractions.createdAt))
-      .limit(1)
+    const latest = await getLatestExtraction(db, doc.id)
     if (!latest || latest.status === 'needs_review' || latest.status === 'rejected') return true
   }
 
@@ -101,7 +100,7 @@ const handler: Handler = async (req, res) => {
     return
   }
 
-  const cpf = await decryptField(applicant.cpfEncrypted, {
+  const declaredCpf = await decryptField(applicant.cpfEncrypted, {
     db,
     actor,
     entityType: 'applicant',
@@ -109,20 +108,102 @@ const handler: Handler = async (req, res) => {
     field: 'cpf',
     applicationId,
   })
+  const declaredFullName = await decryptField(applicant.fullNameEncrypted, {
+    db,
+    actor,
+    entityType: 'applicant',
+    entityId: applicant.id,
+    field: 'fullName',
+    applicationId,
+  })
+  const birthDate = applicant.birthDateEncrypted
+    ? await decryptField(applicant.birthDateEncrypted, {
+        db,
+        actor,
+        entityType: 'applicant',
+        entityId: applicant.id,
+        field: 'birthDate',
+        applicationId,
+      })
+    : null
 
-  const result = checkBureauMock(cpf)
-  const [check] = await db
+  // Bureau (simulado)
+  const bureauResult = checkBureauMock(declaredCpf)
+  const [bureauCheck] = await db
     .insert(bureauChecks)
     .values({
       applicationId,
-      score: result.score,
-      hasRestriction: result.hasRestriction,
-      restrictionDetailsJson: result.restrictionDetails,
-      rawResponseJson: result,
+      score: bureauResult.score,
+      hasRestriction: bureauResult.hasRestriction,
+      restrictionDetailsJson: bureauResult.restrictionDetails,
+      rawResponseJson: bureauResult,
     })
     .returning()
 
-  sendJson(res, 201, check)
+  // Consulta veicular (FIPE real + restrição simulada)
+  const fipe = await lookupFipeValue(
+    application.vehicleMake,
+    application.vehicleModel,
+    application.vehicleYear,
+  )
+  const restriction = checkVehicleRestrictionMock(application.vehiclePlate)
+  const [vehicleCheck] = await db
+    .insert(vehicleChecks)
+    .values({
+      applicationId,
+      fipeValue: fipe.fipeValue,
+      fipeCode: fipe.fipeCode,
+      fipeBrand: fipe.fipeBrand,
+      fipeModel: fipe.fipeModel,
+      fipeYear: fipe.fipeYear,
+      restrictionFound: restriction.restrictionFound,
+      restrictionDetailsJson: restriction.restrictionDetails,
+      source: 'brasilapi-fipe+mock-detran',
+    })
+    .returning()
+
+  // Anti-fraude: cruza o declarado com o que a IA extraiu de qualquer
+  // documento de identidade já aceito (auto_accepted/reviewed).
+  const docs = await db.select().from(documents).where(eq(documents.applicationId, applicationId))
+  let extractedCpf: string | null = null
+  let extractedFullName: string | null = null
+  for (const doc of docs) {
+    const extraction = await getLatestExtraction(db, doc.id)
+    if (!extraction || extraction.status === 'needs_review' || extraction.status === 'rejected') {
+      continue
+    }
+    const fields = JSON.parse(
+      await decryptField(extraction.extractedFieldsEncrypted, {
+        db,
+        actor,
+        entityType: 'document',
+        entityId: doc.id,
+        field: 'extractedFields',
+        applicationId,
+      }),
+    ) as Record<string, string>
+    if (!extractedCpf && fields.cpf) extractedCpf = fields.cpf.replace(/\D/g, '')
+    if (!extractedFullName && fields.nome) extractedFullName = fields.nome
+  }
+
+  const antifraudResult = checkAntifraud({
+    declaredCpf,
+    declaredFullName,
+    extractedCpf,
+    extractedFullName,
+    birthDate,
+  })
+  const [antifraudCheck] = await db
+    .insert(antifraudChecks)
+    .values({
+      applicationId,
+      riskScore: antifraudResult.riskScore,
+      flagsJson: antifraudResult.flags,
+      provider: antifraudResult.provider,
+    })
+    .returning()
+
+  sendJson(res, 201, { bureauCheck, vehicleCheck, antifraudCheck })
 }
 
 export default handler

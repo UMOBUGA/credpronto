@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '../_lib/db'
 import {
+  antifraudChecks,
   applicants,
   applications,
   bureauChecks,
@@ -9,6 +10,7 @@ import {
   documentExtractions,
   documents,
   loanOffers,
+  vehicleChecks,
 } from '../_lib/schema'
 import { decryptField, type DecryptFieldContext } from '../_lib/crypto'
 import { requireDealerSession } from '../_lib/auth'
@@ -126,6 +128,18 @@ async function handleGet(
     .where(eq(bureauChecks.applicationId, applicationId))
     .orderBy(desc(bureauChecks.checkedAt))
     .limit(1)
+  const [latestVehicleCheck] = await db
+    .select()
+    .from(vehicleChecks)
+    .where(eq(vehicleChecks.applicationId, applicationId))
+    .orderBy(desc(vehicleChecks.checkedAt))
+    .limit(1)
+  const [latestAntifraudCheck] = await db
+    .select()
+    .from(antifraudChecks)
+    .where(eq(antifraudChecks.applicationId, applicationId))
+    .orderBy(desc(antifraudChecks.checkedAt))
+    .limit(1)
   const [latestDecision] = await db
     .select()
     .from(creditDecisions)
@@ -151,6 +165,8 @@ async function handleGet(
     },
     documents: docs,
     latestBureauCheck: latestBureauCheck ?? null,
+    latestVehicleCheck: latestVehicleCheck ?? null,
+    latestAntifraudCheck: latestAntifraudCheck ?? null,
     latestDecision: latestDecision ?? null,
     offers,
   })

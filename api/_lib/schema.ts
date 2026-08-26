@@ -88,6 +88,10 @@ export const applications = pgTable('applications', {
   vehicleModel: text('vehicle_model').notNull(),
   vehicleYear: integer('vehicle_year').notNull(),
   vehiclePrice: real('vehicle_price').notNull(),
+  // Obrigatória desde a Fase 3 — a loja já sabe a placa do carro do próprio
+  // estoque, e a consulta veicular simulada (vehicleRestriction.ts) precisa
+  // dela.
+  vehiclePlate: text('vehicle_plate').notNull(),
   downPayment: real('down_payment').notNull().default(0),
   requestedAmount: real('requested_amount').notNull(),
   requestedTermMonths: integer('requested_term_months').notNull(),
@@ -176,6 +180,50 @@ export const bureauChecks = pgTable('bureau_checks', {
   hasRestriction: boolean('has_restriction').notNull(),
   restrictionDetailsJson: jsonb('restriction_details_json'),
   rawResponseJson: jsonb('raw_response_json'),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * Preço FIPE real (BrasilAPI, ver `api/_lib/fipe.ts`) + restrição de
+ * roubo/furto/gravame simulada (`vehicleRestriction.ts` — não existe API
+ * pública gratuita pra isso no Brasil). As duas metades ficam na mesma
+ * linha porque representam uma única "consulta veicular" do ponto de vista
+ * do dealer, mesmo vindo de fontes com credibilidade bem diferente — os
+ * campos `fipe*` ficam `null` quando a busca não encontra correspondência
+ * (marca/modelo digitado não bate com o nome exato da FIPE) ou a API está
+ * fora, nunca travando a esteira por isso.
+ */
+export const vehicleChecks = pgTable('vehicle_checks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id')
+    .notNull()
+    .references(() => applications.id),
+  fipeValue: real('fipe_value'),
+  fipeCode: text('fipe_code'),
+  fipeBrand: text('fipe_brand'),
+  fipeModel: text('fipe_model'),
+  fipeYear: text('fipe_year'),
+  restrictionFound: boolean('restriction_found').notNull(),
+  restrictionDetailsJson: jsonb('restriction_details_json'),
+  source: text('source').notNull(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * `flagsJson` combina sinais reais (cross-validation contra o que a IA
+ * extraiu do documento na Fase 2 — CPF/nome declarados vs. extraídos,
+ * idade mínima) com um mock de "consulta a uma base de fraudadores
+ * conhecidos" (provider real exigiria contrato comercial, mesma limitação
+ * do bureau).
+ */
+export const antifraudChecks = pgTable('antifraud_checks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id')
+    .notNull()
+    .references(() => applications.id),
+  riskScore: integer('risk_score').notNull(),
+  flagsJson: jsonb('flags_json').notNull(),
+  provider: text('provider').notNull(),
   checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -281,6 +329,10 @@ export type DocumentExtraction = typeof documentExtractions.$inferSelect
 export type NewDocumentExtraction = typeof documentExtractions.$inferInsert
 export type BureauCheck = typeof bureauChecks.$inferSelect
 export type NewBureauCheck = typeof bureauChecks.$inferInsert
+export type VehicleCheck = typeof vehicleChecks.$inferSelect
+export type NewVehicleCheck = typeof vehicleChecks.$inferInsert
+export type AntifraudCheck = typeof antifraudChecks.$inferSelect
+export type NewAntifraudCheck = typeof antifraudChecks.$inferInsert
 export type CreditDecision = typeof creditDecisions.$inferSelect
 export type NewCreditDecision = typeof creditDecisions.$inferInsert
 export type LoanOffer = typeof loanOffers.$inferSelect

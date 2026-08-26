@@ -43,8 +43,10 @@ sem passar por essa função é o bug mais grave possível neste projeto. `cpfHa
 permite dedupe por CPF sem nunca decriptar.
 
 **Decisão de crédito nunca vem de IA.** `api/_lib/decision.ts::decide()` é puro, determinístico,
-sem I/O. A IA (Claude, Fase 3) só gera texto explicando uma decisão já tomada — nunca decide.
-Essa fronteira é deliberada (auditabilidade/responsabilidade), não uma limitação técnica.
+sem I/O. A IA (Claude, Fase 4) só gera texto explicando uma decisão já tomada — nunca decide.
+Essa fronteira é deliberada (auditabilidade/responsabilidade), não uma limitação técnica. A ordem
+de checagem dentro de `decide()` importa: restrição de veículo nega antes de qualquer outra coisa,
+fraude grave força revisão humana antes do resto — ver comentário no topo da função.
 
 **Bureau de crédito é simulado** (`api/_lib/bureau.ts`) — Serasa/SPC real exige CNPJ e contrato
 comercial, inviável para portfólio. Determinístico por CPF (mesmo CPF → mesmo resultado).
@@ -70,6 +72,26 @@ proposta está `extracted` com a extração mais recente em `auto_accepted`/`rev
 para em `documents_review_required` até o dealer resolver via
 `PATCH /api/documents/[id]/extract` (`approve`/`correct`/`reject`).
 
+**Consulta veicular e anti-fraude** (Fase 3) rodam junto com o bureau, na mesma chamada a
+`api/bureau/check.ts` — sem endpoints próprios, sem estado novo na máquina.
+
+- `api/_lib/fipe.ts`: preço FIPE **real**, via BrasilAPI (`marcas → veiculos → anos → detalhes`,
+  cadeia confirmada lendo o código-fonte deles, verificada também contra a API ao vivo). Cache em
+  memória de processo pra marca/modelo. A loja digita marca/modelo como texto livre — melhor
+  correspondência por nome normalizado; sem correspondência ou API fora do ar, devolve tudo
+  `null` (enriquecimento, nunca bloqueia a esteira).
+- `api/_lib/vehicleRestriction.ts`: restrição de roubo/furto/gravame por placa, **simulada** —
+  não existe API pública gratuita pra isso no Brasil (só o app do Sinesp, sem API pra terceiros;
+  provedores comerciais exigem contrato, mesma limitação do bureau). Determinístico por placa.
+- `api/_lib/antifraud.ts`: metade **real** (cruza CPF/nome declarados na proposta com o que a IA
+  extraiu do documento na Fase 2, calcula idade a partir da data de nascimento — dado que já
+  existia no sistema, só nunca tinha sido cruzado) + metade **simulada** ("base de fraudadores
+  conhecidos", mesma limitação de contrato comercial do bureau).
+- `decision.ts` usa os três: veículo com restrição nega automaticamente (checado primeiro, antes
+  de qualquer outra coisa); flag grave de antifraude (`cpf_mismatch`/`known_fraud_list`) força
+  `manual_review`, nunca aprova sozinho; LTV alto (valor pedido ÷ valor FIPE) vira fator de risco,
+  não bloqueio automático.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.
@@ -87,6 +109,6 @@ para em `documents_review_required` até o dealer resolver via
   dev/test — simplificação de portfólio; produção real usaria um KMS gerenciado.
 - Documentos no Vercel Blob ficam com `access: 'public'` (URL aleatória, não indexada, mas não
   genuinamente privada) — limitação da API atual do Blob, documentada em `api/_lib/storage.ts`.
-- Open Finance Brasil (Fase 4, ainda não implementada) precisa de credenciamento manual no
+- Open Finance Brasil (Fase 5, ainda não implementada) precisa de credenciamento manual no
   sandbox do Bacen — não é algo que uma sessão de código resolve sozinha.
 - Todo dado usado em desenvolvimento deve ser sintético. Nunca use CPF, nome ou documento reais.

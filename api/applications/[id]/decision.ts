@@ -1,6 +1,13 @@
 import { desc, eq } from 'drizzle-orm'
 import { getDb } from '../../_lib/db'
-import { applicants, applications, bureauChecks, creditDecisions } from '../../_lib/schema'
+import {
+  antifraudChecks,
+  applicants,
+  applications,
+  bureauChecks,
+  creditDecisions,
+  vehicleChecks,
+} from '../../_lib/schema'
 import { decryptField } from '../../_lib/crypto'
 import { requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
@@ -23,7 +30,7 @@ async function handleGet(
 
 /**
  * Roda o motor determinístico (`decision.ts::decide`) — nunca a IA. A IA só
- * entra na Fase 3, gerando um parecer que EXPLICA esta decisão depois de
+ * entra na Fase 4, gerando um parecer que EXPLICA esta decisão depois de
  * tomada, nunca a substitui.
  */
 async function handlePost(
@@ -57,6 +64,28 @@ async function handlePost(
     return
   }
 
+  const [vehicleCheck] = await db
+    .select()
+    .from(vehicleChecks)
+    .where(eq(vehicleChecks.applicationId, applicationId))
+    .orderBy(desc(vehicleChecks.checkedAt))
+    .limit(1)
+  if (!vehicleCheck) {
+    sendJson(res, 409, { error: 'no_vehicle_check' })
+    return
+  }
+
+  const [antifraudCheck] = await db
+    .select()
+    .from(antifraudChecks)
+    .where(eq(antifraudChecks.applicationId, applicationId))
+    .orderBy(desc(antifraudChecks.checkedAt))
+    .limit(1)
+  if (!antifraudCheck) {
+    sendJson(res, 409, { error: 'no_antifraud_check' })
+    return
+  }
+
   const [applicant] = await db
     .select()
     .from(applicants)
@@ -87,6 +116,10 @@ async function handlePost(
     requestedAmount: application.requestedAmount,
     monthlyIncomeDeclared,
     requestedTermMonths: application.requestedTermMonths,
+    vehicleRestrictionFound: vehicleCheck.restrictionFound,
+    fipeValue: vehicleCheck.fipeValue,
+    antifraudRiskScore: antifraudCheck.riskScore,
+    antifraudFlags: antifraudCheck.flagsJson as string[],
   })
 
   const [decision] = await db

@@ -34,6 +34,7 @@ export interface ApplicationSummary {
   vehicleModel: string
   vehicleYear: number
   vehiclePrice: number
+  vehiclePlate: string
   downPayment: number
   requestedAmount: number
   requestedTermMonths: number
@@ -78,6 +79,24 @@ export interface CreditDecisionSummary {
   decidedAt: string
 }
 
+export interface VehicleCheckSummary {
+  id: string
+  fipeValue: number | null
+  fipeCode: string | null
+  fipeBrand: string | null
+  fipeModel: string | null
+  fipeYear: string | null
+  restrictionFound: boolean
+  checkedAt: string
+}
+
+export interface AntifraudCheckSummary {
+  id: string
+  riskScore: number
+  flagsJson: string[]
+  checkedAt: string
+}
+
 export interface LoanOfferSummary {
   id: string
   amount: number
@@ -102,6 +121,8 @@ export interface ApplicationDetail extends ApplicationSummary {
   applicant: ApplicantDetail
   documents: DocumentSummary[]
   latestBureauCheck: BureauCheckSummary | null
+  latestVehicleCheck: VehicleCheckSummary | null
+  latestAntifraudCheck: AntifraudCheckSummary | null
   latestDecision: CreditDecisionSummary | null
   offers: LoanOfferSummary[]
 }

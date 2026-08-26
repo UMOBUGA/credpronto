@@ -1,6 +1,11 @@
-import { eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import type { Db } from './db'
-import { documentExtractions, documents, type DocumentType } from './schema'
+import {
+  documentExtractions,
+  documents,
+  type DocumentExtraction,
+  type DocumentType,
+} from './schema'
 import { getDocument } from './storage'
 import { extractDocument } from './claude'
 import { encryptField } from './crypto'
@@ -60,4 +65,24 @@ export async function runExtraction(db: Db, documentId: string): Promise<RunExtr
     await db.update(documents).set({ status: 'failed' }).where(eq(documents.id, documentId))
     return { documentStatus: 'failed', extractionStatus: null }
   }
+}
+
+/**
+ * A tentativa mais recente de extração de um documento — cada retry insere
+ * uma linha nova (`runExtraction` acima nunca sobrescreve), então "a
+ * extração atual" sempre significa "a mais recente". Compartilhado entre
+ * `api/bureau/check.ts` (bloqueio de avanço + dado pro anti-fraude) e
+ * `api/applications/[id].ts` (tela de revisão do dealer).
+ */
+export async function getLatestExtraction(
+  db: Db,
+  documentId: string,
+): Promise<DocumentExtraction | null> {
+  const [latest] = await db
+    .select()
+    .from(documentExtractions)
+    .where(eq(documentExtractions.documentId, documentId))
+    .orderBy(desc(documentExtractions.createdAt))
+    .limit(1)
+  return latest ?? null
 }

@@ -58,6 +58,7 @@ export async function seedApplication(
       vehicleModel: 'Argo',
       vehicleYear: 2022,
       vehiclePrice: 80000,
+      vehiclePlate: 'ABC1D23',
       downPayment: 10000,
       requestedAmount: 70000,
       requestedTermMonths: 48,
