@@ -10,6 +10,8 @@ const CLEAN_INPUT: DecisionInput = {
   fipeValue: 60000,
   antifraudRiskScore: 0,
   antifraudFlags: [],
+  openfinanceVerified: false,
+  openfinanceIncomeEstimate: null,
 }
 
 describe('decide', () => {
@@ -61,6 +63,33 @@ describe('decide', () => {
   it('trata fipeValue nulo como "sem dado" — não quebra o cálculo de LTV', () => {
     const result = decide({ ...CLEAN_INPUT, fipeValue: null })
     expect(result.factors.loanToValue).toBeNull()
+    expect(result.outcome).toBe('approved')
+  })
+
+  it('não aprova automaticamente quando a renda do Open Finance diverge muito da declarada', () => {
+    const result = decide({
+      ...CLEAN_INPUT,
+      openfinanceVerified: true,
+      openfinanceIncomeEstimate: 2000, // bem abaixo dos 10000 declarados
+    })
+    expect(result.outcome).toBe('manual_review')
+  })
+
+  it('não penaliza quando o cliente não autorizou o Open Finance (ausência de dado é legítima)', () => {
+    const result = decide({
+      ...CLEAN_INPUT,
+      openfinanceVerified: false,
+      openfinanceIncomeEstimate: null,
+    })
+    expect(result.outcome).toBe('approved')
+  })
+
+  it('aprova quando a renda do Open Finance confirma a declarada', () => {
+    const result = decide({
+      ...CLEAN_INPUT,
+      openfinanceVerified: true,
+      openfinanceIncomeEstimate: 11000,
+    })
     expect(result.outcome).toBe('approved')
   })
 })

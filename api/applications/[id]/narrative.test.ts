@@ -35,6 +35,8 @@ async function seedApplicationWithDecision() {
       fipeValue: 60000,
       antifraudRiskScore: 0,
       antifraudFlags: [],
+      openfinanceVerified: false,
+      openfinanceIncomeEstimate: null,
       debtToIncome: 0.05,
       loanToValue: 0.33,
     },

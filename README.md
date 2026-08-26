@@ -5,8 +5,10 @@ recebe um link próprio para completar seus dados e enviar documentos, o sistema
 checagem de bureau simulada e um motor de decisão determinístico, e — se aprovado — gera uma
 oferta de financiamento.
 
-> **Projeto de portfólio.** O bureau de crédito (Serasa/SPC) é simulado — acesso real exige CNPJ
-> e contrato comercial. Todo dado usado em desenvolvimento e nas demos é sintético; nunca use
+> **Projeto de portfólio.** Bureau de crédito (Serasa/SPC), restrição veicular e Open Finance
+> Brasil são simulados — acesso real ao primeiro exige CNPJ e contrato comercial; ao segundo, não
+> existe API pública no Brasil; ao terceiro, autorização do Banco Central (nem contrato resolve
+> pra uma pessoa física). Todo dado usado em desenvolvimento e nas demos é sintético; nunca use
 > CPF, nome ou documento reais neste projeto.
 
 ## Duas frentes
@@ -54,5 +56,5 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 2 — extração de documento via IA (Claude), com revisão manual do dealer
 - ✅ Fase 3 — anti-fraude e consulta veicular (FIPE real via BrasilAPI + restrição simulada)
 - ✅ Fase 4 — parecer de risco via IA (Claude), versão técnica e versão para o cliente
-- ⬜ Fase 5 — integração real com o sandbox do Open Finance Brasil
+- ✅ Fase 5 — Open Finance Brasil simulado (integração real exige autorização do Bacen — ver CLAUDE.md)
 - ⬜ Fase 6 — hardening de LGPD (mascaramento, retenção, trilha de auditoria completa) e polimento

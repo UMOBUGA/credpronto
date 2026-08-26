@@ -267,11 +267,61 @@ export const loanOffers = pgTable('loan_offers', {
 })
 
 /**
+ * Open Finance **simulado** (Fase 5) — participar de verdade, mesmo em
+ * sandbox, exige a instituição ser autorizada pelo Banco Central (ver
+ * CLAUDE.md/README, não é cadastro de desenvolvedor). `provider_consent_id`
+ * e os tokens são gerados por `MockOpenFinanceClient`
+ * (`api/_lib/openfinance.ts`), nunca por um banco de verdade. Mesmo assim
+ * os tokens ficam criptografados como se fossem reais — a tabela existe
+ * pra modelar corretamente o formato de um consentimento regulatório, só a
+ * origem do dado é que é simulada.
+ */
+export const openfinanceConsentStatusEnum = pgEnum('openfinance_consent_status', [
+  'awaiting_authorization',
+  'authorized',
+  'rejected',
+  'revoked',
+  'expired',
+])
+
+export const openfinanceConsents = pgTable('openfinance_consents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id')
+    .notNull()
+    .references(() => applications.id),
+  providerConsentId: text('provider_consent_id').notNull(),
+  status: openfinanceConsentStatusEnum('status').notNull().default('awaiting_authorization'),
+  scopesJson: jsonb('scopes_json').notNull(),
+  accessTokenEncrypted: text('access_token_encrypted'),
+  refreshTokenEncrypted: text('refresh_token_encrypted'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  authorizedAt: timestamp('authorized_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+})
+
+export const openfinanceDataTypeEnum = pgEnum('openfinance_data_type', [
+  'accounts',
+  'transactions',
+  'income',
+])
+
+export const openfinanceData = pgTable('openfinance_data', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  consentId: uuid('consent_id')
+    .notNull()
+    .references(() => openfinanceConsents.id),
+  dataType: openfinanceDataTypeEnum('data_type').notNull(),
+  payloadEncrypted: text('payload_encrypted').notNull(),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
  * Consentimento LGPD (tratamento de dado) — distinto do consentimento
- * financeiro regulatório do Open Finance (`openfinance_consents`, Fase 4).
- * Os dois são modelados de verdade porque respondem perguntas diferentes:
- * "o titular deixou eu processar o dado dele" vs. "o titular autorizou o
- * banco a compartilhar o dado financeiro dele comigo".
+ * financeiro regulatório do Open Finance (`openfinance_consents`, Fase 5,
+ * simulado). Os dois são modelados de verdade porque respondem perguntas
+ * diferentes: "o titular deixou eu processar o dado dele" vs. "o titular
+ * autorizou o banco (simulado) a compartilhar o dado financeiro dele
+ * comigo".
  */
 export const consentTypeEnum = pgEnum('consent_type', [
   'data_processing',
@@ -337,6 +387,10 @@ export type CreditDecision = typeof creditDecisions.$inferSelect
 export type NewCreditDecision = typeof creditDecisions.$inferInsert
 export type LoanOffer = typeof loanOffers.$inferSelect
 export type NewLoanOffer = typeof loanOffers.$inferInsert
+export type OpenfinanceConsent = typeof openfinanceConsents.$inferSelect
+export type NewOpenfinanceConsent = typeof openfinanceConsents.$inferInsert
+export type OpenfinanceData = typeof openfinanceData.$inferSelect
+export type NewOpenfinanceData = typeof openfinanceData.$inferInsert
 export type ConsentRecord = typeof consentRecords.$inferSelect
 export type NewConsentRecord = typeof consentRecords.$inferInsert
 export type AuditLogEntry = typeof auditLog.$inferSelect

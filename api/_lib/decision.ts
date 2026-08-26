@@ -10,6 +10,8 @@ export interface DecisionInput {
   fipeValue: number | null
   antifraudRiskScore: number
   antifraudFlags: string[]
+  openfinanceVerified: boolean
+  openfinanceIncomeEstimate: number | null
 }
 
 export interface DecisionResult {
@@ -26,6 +28,13 @@ const DENY_MIN_DEBT_TO_INCOME = 0.5
 const HIGH_LTV_THRESHOLD = 1.1
 /** Nunca aprova sozinho um caso com um desses sinais — no mínimo revisão humana. */
 const SEVERE_ANTIFRAUD_FLAGS = new Set(['cpf_mismatch', 'known_fraud_list'])
+/**
+ * Renda observada pelo Open Finance (simulado) abaixo de 50% da declarada
+ * já é fator de risco — mas só quando o consentimento foi de fato
+ * autorizado. Ausência de dado (consentimento negado, o que é legítimo e
+ * comum) nunca penaliza.
+ */
+const INCOME_DIVERGENCE_THRESHOLD = 0.5
 
 /**
  * Motor determinístico — nunca chama IA e nunca é chamado por ela. O parecer
@@ -38,7 +47,7 @@ const SEVERE_ANTIFRAUD_FLAGS = new Set(['cpf_mismatch', 'known_fraud_list'])
  * nega antes de qualquer outra coisa — não tem sentido financiar um carro
  * assim, seja qual for o perfil do comprador. Fraude grave vem em seguida e
  * força revisão humana, nunca aprovação automática. Só depois disso o resto
- * (bureau, renda, LTV) decide entre aprovar/negar/revisar.
+ * (bureau, renda, LTV, Open Finance) decide entre aprovar/negar/revisar.
  */
 export function decide(input: DecisionInput): DecisionResult {
   const {
@@ -50,6 +59,8 @@ export function decide(input: DecisionInput): DecisionResult {
     vehicleRestrictionFound,
     fipeValue,
     antifraudFlags,
+    openfinanceVerified,
+    openfinanceIncomeEstimate,
   } = input
 
   const monthlyInstallment = requestedAmount / requestedTermMonths
@@ -74,10 +85,16 @@ export function decide(input: DecisionInput): DecisionResult {
   }
 
   const highLoanToValue = loanToValue !== null && loanToValue > HIGH_LTV_THRESHOLD
+  const hasIncomeDivergence =
+    openfinanceVerified &&
+    openfinanceIncomeEstimate !== null &&
+    openfinanceIncomeEstimate < monthlyIncomeDeclared * INCOME_DIVERGENCE_THRESHOLD
+
   if (
     bureauScore >= APPROVE_MIN_SCORE &&
     debtToIncome <= APPROVE_MAX_DEBT_TO_INCOME &&
-    !highLoanToValue
+    !highLoanToValue &&
+    !hasIncomeDivergence
   ) {
     return { outcome: 'approved', scoreUsed: bureauScore, factors }
   }

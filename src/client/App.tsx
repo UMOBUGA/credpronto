@@ -4,6 +4,7 @@ import { STATUS_LABELS } from '@/shared/statusLabels'
 import type { ApplicationStatus, DocumentSummary } from '@/shared/types'
 import { PersonalDataForm } from './components/PersonalDataForm'
 import { DocumentsSection } from './components/DocumentsSection'
+import { OpenFinanceConsentStep } from './components/OpenFinanceConsentStep'
 
 interface ClientView {
   status: ApplicationStatus
@@ -73,6 +74,8 @@ export default function App() {
 
       {!data.hasSubmittedDetails ? (
         <PersonalDataForm token={token} onSubmitted={invalidate} />
+      ) : data.status === 'awaiting_openfinance_consent' ? (
+        <OpenFinanceConsentStep token={token} onDecided={invalidate} />
       ) : (
         <DocumentsSection token={token} documents={data.documents} onUploaded={invalidate} />
       )}

@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { getDb } from '../../_lib/db'
 import {
   antifraudChecks,
@@ -6,6 +6,8 @@ import {
   applications,
   bureauChecks,
   creditDecisions,
+  openfinanceConsents,
+  openfinanceData,
   vehicleChecks,
 } from '../../_lib/schema'
 import { decryptField } from '../../_lib/crypto'
@@ -116,6 +118,43 @@ async function handlePost(
       )
     : 0
 
+  // Open Finance (simulado) é opcional — consentimento negado é legítimo e
+  // comum, não deve bloquear a esteira nem penalizar a decisão (ver
+  // decision.ts). `openfinanceVerified` só fica true quando o cliente de
+  // fato autorizou.
+  const [latestConsent] = await db
+    .select()
+    .from(openfinanceConsents)
+    .where(eq(openfinanceConsents.applicationId, applicationId))
+    .orderBy(desc(openfinanceConsents.createdAt))
+    .limit(1)
+  const openfinanceVerified = latestConsent?.status === 'authorized'
+  let openfinanceIncomeEstimate: number | null = null
+  if (openfinanceVerified && latestConsent) {
+    const [incomeRow] = await db
+      .select()
+      .from(openfinanceData)
+      .where(
+        and(
+          eq(openfinanceData.consentId, latestConsent.id),
+          eq(openfinanceData.dataType, 'income'),
+        ),
+      )
+      .limit(1)
+    if (incomeRow) {
+      openfinanceIncomeEstimate = Number(
+        await decryptField(incomeRow.payloadEncrypted, {
+          db,
+          actor,
+          entityType: 'openfinance_data',
+          entityId: incomeRow.id,
+          field: 'monthlyIncomeEstimate',
+          applicationId,
+        }),
+      )
+    }
+  }
+
   const result = decide({
     bureauScore: bureauCheck.score,
     hasBureauRestriction: bureauCheck.hasRestriction,
@@ -126,6 +165,8 @@ async function handlePost(
     fipeValue: vehicleCheck.fipeValue,
     antifraudRiskScore: antifraudCheck.riskScore,
     antifraudFlags: antifraudCheck.flagsJson as string[],
+    openfinanceVerified,
+    openfinanceIncomeEstimate,
   })
 
   const [decision] = await db

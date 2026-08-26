@@ -157,6 +157,23 @@ export default function ApplicationDetailPage() {
         </section>
       )}
 
+      {data.latestOpenfinanceConsent && (
+        <section className="detail-section">
+          <h2>Open Finance (simulado)</h2>
+          <p>
+            Consentimento:{' '}
+            {data.latestOpenfinanceConsent.status === 'authorized'
+              ? 'Autorizado'
+              : 'Não autorizado'}
+          </p>
+          {data.latestOpenfinanceConsent.monthlyIncomeEstimate != null && (
+            <p>
+              Renda estimada: {formatCurrency(data.latestOpenfinanceConsent.monthlyIncomeEstimate)}
+            </p>
+          )}
+        </section>
+      )}
+
       {data.latestDecision && (
         <section className="detail-section">
           <h2>Decisão</h2>
@@ -177,10 +194,18 @@ export default function ApplicationDetailPage() {
       <section className="detail-section actions">
         {(data.status === 'client_submitted' || data.status === 'documents_review_required') && (
           <button onClick={() => runBureauCheck.mutate()} disabled={runBureauCheck.isPending}>
+            {runBureauCheck.isPending ? 'Verificando…' : 'Verificar documentos'}
+          </button>
+        )}
+        {(data.status === 'openfinance_authorized' || data.status === 'openfinance_failed') && (
+          <button onClick={() => runBureauCheck.mutate()} disabled={runBureauCheck.isPending}>
             {runBureauCheck.isPending
               ? 'Consultando…'
               : 'Rodar verificações (bureau, veículo, antifraude)'}
           </button>
+        )}
+        {data.status === 'awaiting_openfinance_consent' && (
+          <p className="hint-text">Aguardando o cliente autorizar (ou não) o Open Finance.</p>
         )}
         {data.status === 'running_checks' && (
           <button onClick={() => runDecision.mutate()} disabled={runDecision.isPending}>

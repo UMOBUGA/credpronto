@@ -104,6 +104,26 @@ requisição; `POST /api/applications/[id]/narrative` é o retry manual, dispon�
 do dealer quanto reaproveitado pelo fluxo de revisão manual (`resolve.ts`) — toda nova linha em
 `credit_decisions` tenta gerar parecer, seja do motor automático ou de uma decisão humana.
 
+**Open Finance Brasil é simulado** (`api/_lib/openfinance.ts`, Fase 5) — **não** por falta de
+esforço, mas por barreira regulatória: pesquisa feita antes de começar a fase mostrou que
+participar do Open Finance, mesmo em sandbox, exige a instituição ser autorizada pelo Banco
+Central (o cadastro no Diretório de Participantes pede prova dessa autorização). Não é um
+cadastro de desenvolvedor — nem contrato comercial resolveria, diferente do bureau. `Mock
+OpenFinanceClient` é determinístico por CPF, mesmo espírito de `bureau.ts`; `RealOpenFinanceClient`
+existe só pra documentar o formato de uma integração real (OAuth2/FAPI/mTLS) — cada método lança
+um erro explícito em vez de fingir funcionar, porque um cliente real nunca testado contra um
+servidor de verdade seria pior que não escrever.
+
+Fluxo simulado sem redirecionamento real (não há banco de sandbox pra ir e voltar):
+`api/bureau/check.ts` foi dividido em duas fases pela mesma chamada — a fase de documentos agora
+**para** em `awaiting_openfinance_consent` em vez de pular automático como nas Fases 2-4, porque
+existe um passo real do cliente ali (`POST /api/client/[token]/openfinance`, `{decision: 'authorize'
+| 'deny'}`, cria o consentimento e já busca o dado simulado numa chamada só); a fase de checagens
+libera a partir de `openfinance_authorized` **ou** `openfinance_failed` — consentimento negado é
+legítimo e não bloqueia. `decision.ts` usa a renda estimada pelo Open Finance simulado como mais
+um fator: muito abaixo da declarada empurra pra `manual_review` (nunca bloqueia sozinha), ausência
+de dado nunca penaliza.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.
@@ -121,6 +141,8 @@ do dealer quanto reaproveitado pelo fluxo de revisão manual (`resolve.ts`) — 
   dev/test — simplificação de portfólio; produção real usaria um KMS gerenciado.
 - Documentos no Vercel Blob ficam com `access: 'public'` (URL aleatória, não indexada, mas não
   genuinamente privada) — limitação da API atual do Blob, documentada em `api/_lib/storage.ts`.
-- Open Finance Brasil (Fase 5, ainda não implementada) precisa de credenciamento manual no
-  sandbox do Bacen — não é algo que uma sessão de código resolve sozinha.
+- Open Finance Brasil é e sempre será simulado neste projeto — participar de verdade exige a
+  instituição ser autorizada pelo Banco Central, uma barreira regulatória que nenhuma sessão de
+  código (nem um cadastro de desenvolvedor, nem dinheiro) resolve pra um projeto de portfólio.
+  Ver a seção "Open Finance Brasil é simulado" acima.
 - Todo dado usado em desenvolvimento deve ser sintético. Nunca use CPF, nome ou documento reais.

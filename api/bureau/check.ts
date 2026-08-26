@@ -20,7 +20,8 @@ import { getLatestExtraction } from '../_lib/documentExtraction'
 import { readJsonBody, sendJson, type Handler } from '../_lib/http'
 
 const bodySchema = z.object({ applicationId: z.string().uuid() })
-const READY_STATUSES = new Set(['client_submitted', 'documents_review_required'])
+const DOCUMENT_PHASE_STATUSES = new Set(['client_submitted', 'documents_review_required'])
+const CHECKS_PHASE_STATUSES = new Set(['openfinance_authorized', 'openfinance_failed'])
 
 /**
  * Um documento bloqueia o avanço da esteira se a extração nunca terminou
@@ -45,40 +46,32 @@ async function hasBlockingDocument(
   return false
 }
 
-const handler: Handler = async (req, res) => {
-  const db = await getDb()
-  const user = await requireDealerSession(req, res, db)
-  if (!user) return
-
-  const parsed = bodySchema.safeParse(await readJsonBody(req))
-  if (!parsed.success) {
-    sendJson(res, 400, { error: 'invalid_body' })
-    return
-  }
-
-  const { applicationId } = parsed.data
-  const [application] = await db
-    .select()
-    .from(applications)
-    .where(eq(applications.id, applicationId))
-    .limit(1)
-  if (!application) {
-    sendJson(res, 404, { error: 'not_found' })
-    return
-  }
-  if (!READY_STATUSES.has(application.status)) {
-    sendJson(res, 409, { error: 'not_ready', status: application.status })
-    return
-  }
-
-  const actor = { actorType: 'dealer_user' as const, actorId: user.id }
-
-  if (application.status === 'client_submitted') {
+/**
+ * Mesmo botão do dealer ("rodar verificações"), dois estágios da esteira:
+ *
+ * 1. Fase de documentos (`client_submitted`/`documents_review_required`):
+ *    confere se os documentos estão prontos e para em
+ *    `awaiting_openfinance_consent` — diferente das Fases 2-4, não pula
+ *    mais automático pra frente, porque agora existe um passo real do
+ *    cliente ali (`POST /api/client/[token]/openfinance`, Fase 5).
+ * 2. Fase de checagens (`openfinance_authorized`/`openfinance_failed`,
+ *    os dois liberam — ausência de dado do Open Finance não bloqueia):
+ *    roda bureau + consulta veicular + antifraude e avança pra
+ *    `running_checks`.
+ */
+async function handleDocumentPhase(
+  res: Parameters<Handler>[1],
+  db: Awaited<ReturnType<typeof getDb>>,
+  applicationId: string,
+  currentStatus: string,
+  actor: { actorType: 'dealer_user'; actorId: string },
+) {
+  if (currentStatus === 'client_submitted') {
     await transition(db, applicationId, 'processing_documents', actor)
   }
 
   if (await hasBlockingDocument(db, applicationId)) {
-    if (application.status !== 'documents_review_required') {
+    if (currentStatus !== 'documents_review_required') {
       await transition(db, applicationId, 'documents_review_required', actor)
     }
     sendJson(res, 200, { status: 'documents_review_required' })
@@ -87,7 +80,23 @@ const handler: Handler = async (req, res) => {
 
   await transition(db, applicationId, 'documents_verified', actor)
   await transition(db, applicationId, 'awaiting_openfinance_consent', actor)
-  await transition(db, applicationId, 'openfinance_failed', actor)
+  sendJson(res, 200, { status: 'awaiting_openfinance_consent' })
+}
+
+async function handleChecksPhase(
+  res: Parameters<Handler>[1],
+  db: Awaited<ReturnType<typeof getDb>>,
+  application: {
+    id: string
+    applicantId: string
+    vehicleMake: string
+    vehicleModel: string
+    vehicleYear: number
+    vehiclePlate: string
+  },
+  actor: { actorType: 'dealer_user'; actorId: string },
+) {
+  const applicationId = application.id
   await transition(db, applicationId, 'running_checks', actor)
 
   const [applicant] = await db
@@ -204,6 +213,42 @@ const handler: Handler = async (req, res) => {
     .returning()
 
   sendJson(res, 201, { bureauCheck, vehicleCheck, antifraudCheck })
+}
+
+const handler: Handler = async (req, res) => {
+  const db = await getDb()
+  const user = await requireDealerSession(req, res, db)
+  if (!user) return
+
+  const parsed = bodySchema.safeParse(await readJsonBody(req))
+  if (!parsed.success) {
+    sendJson(res, 400, { error: 'invalid_body' })
+    return
+  }
+
+  const { applicationId } = parsed.data
+  const [application] = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.id, applicationId))
+    .limit(1)
+  if (!application) {
+    sendJson(res, 404, { error: 'not_found' })
+    return
+  }
+
+  const actor = { actorType: 'dealer_user' as const, actorId: user.id }
+
+  if (DOCUMENT_PHASE_STATUSES.has(application.status)) {
+    await handleDocumentPhase(res, db, applicationId, application.status, actor)
+    return
+  }
+  if (CHECKS_PHASE_STATUSES.has(application.status)) {
+    await handleChecksPhase(res, db, application, actor)
+    return
+  }
+
+  sendJson(res, 409, { error: 'not_ready', status: application.status })
 }
 
 export default handler

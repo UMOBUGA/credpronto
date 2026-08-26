@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '../_lib/db'
 import {
@@ -10,6 +10,8 @@ import {
   documentExtractions,
   documents,
   loanOffers,
+  openfinanceConsents,
+  openfinanceData,
   vehicleChecks,
 } from '../_lib/schema'
 import { decryptField, type DecryptFieldContext } from '../_lib/crypto'
@@ -151,6 +153,40 @@ async function handleGet(
     .from(loanOffers)
     .where(eq(loanOffers.applicationId, applicationId))
 
+  const [latestOpenfinanceConsent] = await db
+    .select({
+      id: openfinanceConsents.id,
+      status: openfinanceConsents.status,
+      authorizedAt: openfinanceConsents.authorizedAt,
+    })
+    .from(openfinanceConsents)
+    .where(eq(openfinanceConsents.applicationId, applicationId))
+    .orderBy(desc(openfinanceConsents.createdAt))
+    .limit(1)
+  let openfinanceIncomeEstimate: number | null = null
+  if (latestOpenfinanceConsent?.status === 'authorized') {
+    const [incomeRow] = await db
+      .select()
+      .from(openfinanceData)
+      .where(
+        and(
+          eq(openfinanceData.consentId, latestOpenfinanceConsent.id),
+          eq(openfinanceData.dataType, 'income'),
+        ),
+      )
+      .limit(1)
+    if (incomeRow) {
+      openfinanceIncomeEstimate = Number(
+        await decryptField(incomeRow.payloadEncrypted, {
+          ...baseCtx,
+          entityType: 'openfinance_data',
+          entityId: incomeRow.id,
+          field: 'monthlyIncomeEstimate',
+        }),
+      )
+    }
+  }
+
   sendJson(res, 200, {
     ...application,
     applicant: {
@@ -167,6 +203,9 @@ async function handleGet(
     latestBureauCheck: latestBureauCheck ?? null,
     latestVehicleCheck: latestVehicleCheck ?? null,
     latestAntifraudCheck: latestAntifraudCheck ?? null,
+    latestOpenfinanceConsent: latestOpenfinanceConsent
+      ? { ...latestOpenfinanceConsent, monthlyIncomeEstimate: openfinanceIncomeEstimate }
+      : null,
     latestDecision: latestDecision ?? null,
     offers,
   })

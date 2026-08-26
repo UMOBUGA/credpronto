@@ -215,6 +215,13 @@ function buildNarrativePrompt(
         ? `, sinais encontrados: ${factors.antifraudFlags.join(', ')}`
         : ', sem sinais encontrados'
     }.`,
+    factors.openfinanceVerified
+      ? `Renda estimada via Open Finance (simulado): ${
+          factors.openfinanceIncomeEstimate != null
+            ? formatCurrencyBr(factors.openfinanceIncomeEstimate)
+            : 'não disponível'
+        }.`
+      : 'Cliente não autorizou o compartilhamento de dados via Open Finance (não penaliza a decisão).',
   ]
   return lines.join('\n')
 }

@@ -97,6 +97,13 @@ export interface AntifraudCheckSummary {
   checkedAt: string
 }
 
+export interface OpenfinanceConsentSummary {
+  id: string
+  status: 'awaiting_authorization' | 'authorized' | 'rejected' | 'revoked' | 'expired'
+  authorizedAt: string | null
+  monthlyIncomeEstimate: number | null
+}
+
 export interface LoanOfferSummary {
   id: string
   amount: number
@@ -123,6 +130,7 @@ export interface ApplicationDetail extends ApplicationSummary {
   latestBureauCheck: BureauCheckSummary | null
   latestVehicleCheck: VehicleCheckSummary | null
   latestAntifraudCheck: AntifraudCheckSummary | null
+  latestOpenfinanceConsent: OpenfinanceConsentSummary | null
   latestDecision: CreditDecisionSummary | null
   offers: LoanOfferSummary[]
 }
