@@ -1,0 +1,6 @@
+dist
+coverage
+node_modules
+.pglite-data
+.data
+drizzle
