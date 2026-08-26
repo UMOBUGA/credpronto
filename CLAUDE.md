@@ -49,6 +49,27 @@ Essa fronteira é deliberada (auditabilidade/responsabilidade), não uma limita�
 **Bureau de crédito é simulado** (`api/_lib/bureau.ts`) — Serasa/SPC real exige CNPJ e contrato
 comercial, inviável para portfólio. Determinístico por CPF (mesmo CPF → mesmo resultado).
 
+**Extração de documento por IA** (`api/_lib/claude.ts` + `api/_lib/documentExtraction.ts`,
+Fase 2): a IA lê o documento (imagem/PDF) e devolve campos estruturados via tool use — nunca
+decide nada, só extrai. `runExtraction()` roda **de forma síncrona** logo após o upload no
+portal do cliente (`api/client/[token]/documents.ts`), desvio deliberado do plano original
+("assíncrono, não bloqueia o upload"): uma função Vercel Node comum não tem como continuar
+trabalhando depois de `res.end()` sem depender de uma API específica do Vercel (`waitUntil`),
+o que quebraria a portabilidade dev/produção que o projeto inteiro preserva. A troca é a
+resposta demorar alguns segundos a mais, mas sem precisar de polling — o cliente já recebe o
+status final na mesma requisição.
+
+Confiança abaixo de 75%, qualquer `issue` reportado pelo modelo, ou um CPF que falha no
+checksum (`api/_lib/cpfValidation.ts`) força `needs_review` mesmo com confiança alta — o
+checksum roda sempre em cima do que a IA extrai, nunca confia cegamente. Sem `ANTHROPIC_API_KEY`
+configurada, a extração falha (`documents.status = 'failed'`) de forma previsível — não derruba
+a requisição, só fica pendente de retry manual (`POST /api/documents/[id]/extract`).
+
+`api/bureau/check.ts` só avança a proposta para `running_checks` quando **todo** documento da
+proposta está `extracted` com a extração mais recente em `auto_accepted`/`reviewed` — senão,
+para em `documents_review_required` até o dealer resolver via
+`PATCH /api/documents/[id]/extract` (`approve`/`correct`/`reject`).
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

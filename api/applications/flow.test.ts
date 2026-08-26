@@ -1,3 +1,11 @@
+const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }))
+
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class {
+    messages = { create: createMock }
+  },
+}))
+
 import applicationsIndexHandler from './index'
 import applicationDetailHandler from './[id]'
 import bureauCheckHandler from '../bureau/check'
@@ -12,12 +20,12 @@ import { createSessionToken, SESSION_COOKIE_NAME } from '../_lib/auth'
 import { mockReq, mockRes } from '../_lib/testHttp'
 
 /**
- * Exercita a esteira inteira da Fase 1 ponta a ponta, chamando os handlers
- * diretamente (sem servidor HTTP real) contra o mesmo PGlite em memória —
- * é o teste que prova o critério de "pronto" da Fase 1: caminho feliz sem
- * nenhuma credencial externa.
+ * Exercita a esteira inteira ponta a ponta (Fases 0-2), chamando os
+ * handlers diretamente (sem servidor HTTP real) contra o mesmo PGlite em
+ * memória. O SDK da Anthropic é mockado — nunca chama a API real em CI —
+ * simulando uma extração de documento limpa e de alta confiança.
  */
-describe('esteira — caminho feliz (Fase 1, tudo simulado)', () => {
+describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', () => {
   const originalScenario = process.env.MOCK_BUREAU_SCENARIO
 
   beforeAll(() => {
@@ -28,8 +36,26 @@ describe('esteira — caminho feliz (Fase 1, tudo simulado)', () => {
   afterAll(() => {
     process.env.MOCK_BUREAU_SCENARIO = originalScenario
   })
+  beforeEach(() => {
+    createMock.mockReset()
+    createMock.mockResolvedValue({
+      model: 'claude-opus-5',
+      content: [
+        {
+          type: 'tool_use',
+          id: 't1',
+          name: 'extract_document_fields',
+          input: {
+            fields: { nome: 'Ciclano de Teste', rendaMensalDeclarada: '10000' },
+            confidence: 0.95,
+            issues: [],
+          },
+        },
+      ],
+    })
+  })
 
-  it('cria proposta, cliente envia dados e documento, bureau roda, decisão é calculada e a oferta é gerada', async () => {
+  it('cria proposta, cliente envia dados e documento, extração roda, bureau roda, decisão é calculada e a oferta é gerada', async () => {
     const db = await getDb()
     const dealer = await seedDealerUser(db)
     const cookie = `${SESSION_COOKIE_NAME}=${createSessionToken(dealer.id)}`
@@ -95,12 +121,14 @@ describe('esteira — caminho feliz (Fase 1, tudo simulado)', () => {
         body: {
           type: 'comprovante_renda',
           filename: 'comprovante.pdf',
+          mimeType: 'application/pdf',
           contentBase64: Buffer.from('conteúdo fake de teste').toString('base64'),
         },
       }),
       documentRes,
     )
     expect(documentRes.statusCode).toBe(201)
+    expect((documentRes.body as { status: string }).status).toBe('extracted')
 
     const bureauRes = mockRes()
     await bureauCheckHandler(
@@ -142,8 +170,106 @@ describe('esteira — caminho feliz (Fase 1, tudo simulado)', () => {
       mockReq(`/api/applications/${applicationId}`, { headers: { cookie } }),
       detailRes,
     )
-    const detail = detailRes.body as { status: string; applicant: { fullName: string } }
+    const detail = detailRes.body as {
+      status: string
+      applicant: { fullName: string }
+      documents: { extraction: { status: string; fields: Record<string, string> } | null }[]
+    }
     expect(detail.status).toBe('offer_created')
     expect(detail.applicant.fullName).toBe('Ciclano de Teste')
+    expect(detail.documents[0]?.extraction?.status).toBe('auto_accepted')
+    expect(detail.documents[0]?.extraction?.fields.nome).toBe('Ciclano de Teste')
+  })
+
+  it('quando a extração precisa de revisão, a esteira para em documents_review_required até o dealer resolver', async () => {
+    const db = await getDb()
+    const dealer = await seedDealerUser(db)
+    const cookie = `${SESSION_COOKIE_NAME}=${createSessionToken(dealer.id)}`
+
+    const createRes = mockRes()
+    await applicationsIndexHandler(
+      mockReq('/api/applications', {
+        method: 'POST',
+        headers: { cookie },
+        body: {
+          applicant: {
+            fullName: 'Beltrano de Teste',
+            cpf: '15350946056',
+            phone: '11977776666',
+            email: 'beltrano@example.test',
+          },
+          vehicleMake: 'VW',
+          vehicleModel: 'Polo',
+          vehicleYear: 2023,
+          vehiclePrice: 90000,
+          downPayment: 15000,
+          requestedAmount: 75000,
+          requestedTermMonths: 36,
+        },
+      }),
+      createRes,
+    )
+    const { id: applicationId, clientPortalToken: token } = createRes.body as {
+      id: string
+      clientPortalToken: string
+    }
+
+    await clientSubmitHandler(
+      mockReq(`/api/client/${token}/submit`, {
+        method: 'POST',
+        body: {
+          birthDate: '1985-05-05',
+          address: { street: 'Rua B', number: '1', city: 'SP', state: 'SP', zip: '02000-000' },
+          monthlyIncomeDeclared: 12000,
+          consent: true,
+        },
+      }),
+      mockRes(),
+    )
+
+    // Baixa confiança força needs_review mesmo sem erro de API.
+    createMock.mockResolvedValue({
+      model: 'claude-opus-5',
+      content: [
+        {
+          type: 'tool_use',
+          id: 't2',
+          name: 'extract_document_fields',
+          input: { fields: {}, confidence: 0.1, issues: ['imagem ilegível'] },
+        },
+      ],
+    })
+
+    await clientDocumentsHandler(
+      mockReq(`/api/client/${token}/documents`, {
+        method: 'POST',
+        body: {
+          type: 'rg',
+          filename: 'rg.jpg',
+          mimeType: 'image/jpeg',
+          contentBase64: Buffer.from('conteúdo fake ilegível').toString('base64'),
+        },
+      }),
+      mockRes(),
+    )
+
+    const bureauRes = mockRes()
+    await bureauCheckHandler(
+      mockReq('/api/bureau/check', {
+        method: 'POST',
+        headers: { cookie },
+        body: { applicationId },
+      }),
+      bureauRes,
+    )
+    expect(bureauRes.statusCode).toBe(200)
+    expect((bureauRes.body as { status: string }).status).toBe('documents_review_required')
+
+    const detailRes = mockRes()
+    await applicationDetailHandler(
+      mockReq(`/api/applications/${applicationId}`, { headers: { cookie } }),
+      detailRes,
+    )
+    expect((detailRes.body as { status: string }).status).toBe('documents_review_required')
   })
 })

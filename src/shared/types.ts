@@ -43,11 +43,23 @@ export interface ApplicationSummary {
   updatedAt: string
 }
 
+export type DocumentType = 'rg' | 'cpf' | 'cnh' | 'comprovante_renda' | 'comprovante_residencia'
+
+export interface DocumentExtractionSummary {
+  id: string
+  status: 'auto_accepted' | 'needs_review' | 'reviewed' | 'rejected'
+  confidenceScore: number
+  fields: Record<string, string>
+  reviewedAt: string | null
+}
+
 export interface DocumentSummary {
   id: string
-  type: 'rg' | 'cpf' | 'cnh' | 'comprovante_renda' | 'comprovante_residencia'
+  type: DocumentType
   status: 'uploaded' | 'extracting' | 'extracted' | 'failed'
+  mimeType?: string
   createdAt?: string
+  extraction?: DocumentExtractionSummary | null
 }
 
 export interface BureauCheckSummary {

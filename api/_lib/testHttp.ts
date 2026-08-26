@@ -36,19 +36,38 @@ export interface MockRes {
   statusCode: number
   headers: Record<string, string>
   body: unknown
+  rawBody: Buffer | undefined
 }
 
+/**
+ * `end()` aceita string (a maioria dos handlers, via `sendJson`) ou Buffer
+ * (handlers que devolvem bytes crus, ex.: `api/documents/[id]/file.ts`).
+ * `body` só é populado quando o chunk é um JSON válido — pra binário, leia
+ * `rawBody`.
+ */
 export function mockRes(): ServerResponse & MockRes {
   const res = {
     statusCode: 200,
     headers: {} as Record<string, string>,
     body: undefined as unknown,
+    rawBody: undefined as Buffer | undefined,
     setHeader(key: string, value: string) {
       res.headers[key] = value
       return res
     },
-    end(chunk?: string) {
-      if (chunk) res.body = JSON.parse(chunk)
+    end(chunk?: string | Buffer) {
+      if (Buffer.isBuffer(chunk)) {
+        res.rawBody = chunk
+        return res
+      }
+      if (chunk) {
+        res.rawBody = Buffer.from(chunk)
+        try {
+          res.body = JSON.parse(chunk)
+        } catch {
+          // não-JSON — só rawBody fica disponível
+        }
+      }
       return res
     },
   }

@@ -124,8 +124,40 @@ export const documents = pgTable('documents', {
     .references(() => applications.id),
   type: documentTypeEnum('type').notNull(),
   storageKey: text('storage_key').notNull(),
+  // Necessário pra montar o content block certo (`image` vs `document`) na
+  // chamada de extração (Fase 2, `api/_lib/claude.ts`) — o storageKey por si
+  // só não carrega o tipo do arquivo.
+  mimeType: text('mime_type').notNull(),
   uploadedBy: uploadedByEnum('uploaded_by').notNull(),
   status: documentStatusEnum('status').notNull().default('uploaded'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * Uma linha por tentativa de extração (uma nova a cada retry) — nunca
+ * sobrescreve a anterior, então o histórico de tentativas fica preservado.
+ * `auto_accepted`/`needs_review` são decididos pelo pipeline (confiança do
+ * modelo + checksum de CPF, ver `documentExtraction.ts`); `reviewed` e
+ * `rejected` só acontecem por ação humana em `api/documents/[id]/extract.ts`.
+ */
+export const documentExtractionStatusEnum = pgEnum('document_extraction_status', [
+  'auto_accepted',
+  'needs_review',
+  'reviewed',
+  'rejected',
+])
+
+export const documentExtractions = pgTable('document_extractions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  documentId: uuid('document_id')
+    .notNull()
+    .references(() => documents.id),
+  extractedFieldsEncrypted: text('extracted_fields_encrypted').notNull(),
+  confidenceScore: real('confidence_score').notNull(),
+  modelUsed: text('model_used').notNull(),
+  status: documentExtractionStatusEnum('status').notNull(),
+  reviewedBy: uuid('reviewed_by').references(() => dealerUsers.id),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -244,6 +276,9 @@ export type NewApplication = typeof applications.$inferInsert
 export type ApplicationStatus = Application['status']
 export type Document = typeof documents.$inferSelect
 export type NewDocument = typeof documents.$inferInsert
+export type DocumentType = Document['type']
+export type DocumentExtraction = typeof documentExtractions.$inferSelect
+export type NewDocumentExtraction = typeof documentExtractions.$inferInsert
 export type BureauCheck = typeof bureauChecks.$inferSelect
 export type NewBureauCheck = typeof bureauChecks.$inferInsert
 export type CreditDecision = typeof creditDecisions.$inferSelect

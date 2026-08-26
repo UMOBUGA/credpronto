@@ -4,6 +4,7 @@ import { apiFetch } from '@/shared/lib/api'
 import { formatCpf, formatCurrency } from '@/shared/lib/format'
 import { STATUS_LABELS } from '@/shared/statusLabels'
 import type { ApplicationDetail } from '@/shared/types'
+import { DocumentReviewCard } from '../components/DocumentReviewCard'
 
 export default function ApplicationDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -89,13 +90,14 @@ export default function ApplicationDetailPage() {
         {data.documents.length === 0 ? (
           <p>Nenhum documento enviado ainda.</p>
         ) : (
-          <ul>
-            {data.documents.map((doc) => (
-              <li key={doc.id}>
-                {doc.type} — {doc.status}
-              </li>
-            ))}
-          </ul>
+          data.documents.map((doc) => (
+            <DocumentReviewCard
+              key={doc.id}
+              applicationId={data.id}
+              document={doc}
+              onChanged={invalidate}
+            />
+          ))
         )}
       </section>
 

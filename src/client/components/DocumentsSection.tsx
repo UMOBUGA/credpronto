@@ -17,6 +17,13 @@ interface Props {
   onUploaded: () => void
 }
 
+const STATUS_LABELS: Record<DocumentSummary['status'], string> = {
+  uploaded: 'enviado',
+  extracting: 'analisando…',
+  extracted: 'recebido',
+  failed: 'falhou — tente reenviar',
+}
+
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -40,7 +47,7 @@ export function DocumentsSection({ token, documents, onUploaded }: Props) {
       const contentBase64 = await readFileAsBase64(file)
       return apiFetch(`/api/client/${token}/documents`, {
         method: 'POST',
-        body: JSON.stringify({ type, filename: file.name, contentBase64 }),
+        body: JSON.stringify({ type, filename: file.name, mimeType: file.type, contentBase64 }),
       })
     },
     onSuccess: () => {
@@ -56,7 +63,8 @@ export function DocumentsSection({ token, documents, onUploaded }: Props) {
         <ul>
           {documents.map((doc) => (
             <li key={doc.id}>
-              {DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type} — enviado
+              {DOCUMENT_TYPES.find((t) => t.value === doc.type)?.label ?? doc.type} —{' '}
+              {STATUS_LABELS[doc.status]}
             </li>
           ))}
         </ul>

@@ -6,6 +6,7 @@ import {
   applications,
   bureauChecks,
   creditDecisions,
+  documentExtractions,
   documents,
   loanOffers,
 } from '../_lib/schema'
@@ -84,7 +85,41 @@ async function handleGet(
       )
     : null
 
-  const docs = await db.select().from(documents).where(eq(documents.applicationId, applicationId))
+  const docRows = await db
+    .select()
+    .from(documents)
+    .where(eq(documents.applicationId, applicationId))
+  const docs = []
+  for (const doc of docRows) {
+    const [latestExtraction] = await db
+      .select()
+      .from(documentExtractions)
+      .where(eq(documentExtractions.documentId, doc.id))
+      .orderBy(desc(documentExtractions.createdAt))
+      .limit(1)
+
+    let extraction = null
+    if (latestExtraction) {
+      const fields = JSON.parse(
+        await decryptField(latestExtraction.extractedFieldsEncrypted, {
+          ...baseCtx,
+          entityType: 'document',
+          entityId: doc.id,
+          field: 'extractedFields',
+        }),
+      ) as Record<string, string>
+      extraction = {
+        id: latestExtraction.id,
+        status: latestExtraction.status,
+        confidenceScore: latestExtraction.confidenceScore,
+        fields,
+        reviewedAt: latestExtraction.reviewedAt,
+      }
+    }
+
+    docs.push({ ...doc, extraction })
+  }
+
   const [latestBureauCheck] = await db
     .select()
     .from(bureauChecks)

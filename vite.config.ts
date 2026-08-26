@@ -23,7 +23,12 @@ export default defineConfig({
     environment: 'jsdom',
     environmentMatchGlobs: [['api/**', 'node']],
     setupFiles: ['./vitest.setup.ts'],
-    testTimeout: 10000,
+    // Os testes de integração de api/ fazem várias idas ao PGlite em
+    // sequência de propósito (decrypt/transição de estado precisam ser
+    // sequenciais, ver comentários em api/applications/[id].ts e
+    // api/bureau/check.ts) — sob instrumentação de cobertura (v8) isso passa
+    // dos 10s padrão em alguns arquivos maiores.
+    testTimeout: 20000,
     css: false,
     coverage: {
       provider: 'v8',

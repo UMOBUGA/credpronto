@@ -4,6 +4,7 @@ import { documents } from '../../_lib/schema'
 import { putDocument } from '../../_lib/storage'
 import { requireApplicationByToken } from '../../_lib/auth'
 import { logAction } from '../../_lib/audit'
+import { runExtraction } from '../../_lib/documentExtraction'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 const ALLOWED_STATUSES = new Set([
@@ -12,13 +13,31 @@ const ALLOWED_STATUSES = new Set([
   'documents_review_required',
 ])
 const MAX_BYTES = 10 * 1024 * 1024
+const SUPPORTED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+])
 
 const bodySchema = z.object({
   type: z.enum(['rg', 'cpf', 'cnh', 'comprovante_renda', 'comprovante_residencia']),
   filename: z.string().min(1),
+  mimeType: z.enum(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']),
   contentBase64: z.string().min(1),
 })
 
+/**
+ * A extração roda de forma SÍNCRONA aqui, antes de responder — desvio
+ * deliberado do plano original ("assíncrono, não bloqueia o upload"). Uma
+ * função Vercel Node comum não tem um jeito confiável de continuar
+ * trabalhando depois de `res.end()` sem acoplar o código a uma API
+ * específica do Vercel (`waitUntil`), o que contradiz a convenção do projeto
+ * de handlers portáveis entre dev e produção. A troca é aceitável: a
+ * resposta demora alguns segundos a mais, mas o cliente já recebe o status
+ * final da extração na mesma requisição, sem precisar de polling.
+ */
 const handler: Handler = async (req, res) => {
   const db = await getDb()
   const token = pathSegment(req, 1)
@@ -41,6 +60,10 @@ const handler: Handler = async (req, res) => {
     sendJson(res, 400, { error: 'invalid_file_size' })
     return
   }
+  if (!SUPPORTED_MIME_TYPES.has(parsed.data.mimeType)) {
+    sendJson(res, 400, { error: 'unsupported_mime_type' })
+    return
+  }
 
   const extension = parsed.data.filename.includes('.')
     ? `.${parsed.data.filename.split('.').pop()}`
@@ -53,6 +76,7 @@ const handler: Handler = async (req, res) => {
       applicationId: application.id,
       type: parsed.data.type,
       storageKey,
+      mimeType: parsed.data.mimeType,
       uploadedBy: 'applicant',
       status: 'uploaded',
     })
@@ -70,7 +94,9 @@ const handler: Handler = async (req, res) => {
     },
   )
 
-  sendJson(res, 201, document)
+  const extraction = await runExtraction(db, document!.id)
+
+  sendJson(res, 201, { ...document, status: extraction.documentStatus })
 }
 
 export default handler
