@@ -53,6 +53,6 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 1 — esteira core com bureau e decisão simulados, sem IA e sem Open Finance
 - ✅ Fase 2 — extração de documento via IA (Claude), com revisão manual do dealer
 - ✅ Fase 3 — anti-fraude e consulta veicular (FIPE real via BrasilAPI + restrição simulada)
-- ⬜ Fase 4 — parecer de risco via IA
+- ✅ Fase 4 — parecer de risco via IA (Claude), versão técnica e versão para o cliente
 - ⬜ Fase 5 — integração real com o sandbox do Open Finance Brasil
 - ⬜ Fase 6 — hardening de LGPD (mascaramento, retenção, trilha de auditoria completa) e polimento

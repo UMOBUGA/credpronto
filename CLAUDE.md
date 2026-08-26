@@ -92,6 +92,18 @@ para em `documents_review_required` até o dealer resolver via
   `manual_review`, nunca aprova sozinho; LTV alto (valor pedido ÷ valor FIPE) vira fator de risco,
   não bloqueio automático.
 
+**Parecer de risco por IA** (`api/_lib/claude.ts::generateNarrative` + `api/_lib/riskNarrative.ts`,
+Fase 4): roda **depois** de `decide()` já ter decidido e a linha já estar em `credit_decisions` —
+nunca decide nada, só explica os `factorsJson` já persistidos (incluindo os fatores da Fase 3:
+restrição de veículo, LTV, score de antifraude). Chamada síncrona, mesma justificativa da
+extração de documento (Fase 2): sem jeito portável de continuar trabalhando depois de
+`res.end()` numa função Vercel Node comum. Gera duas versões — técnica pro dealer, em linguagem
+simples pro cliente — via tool use, mesmo padrão de `extractDocument`. Não-bloqueante por design:
+se a chamada falhar, a decisão persiste sem parecer (`risk_narrative_* = null`) e não derruba a
+requisição; `POST /api/applications/[id]/narrative` é o retry manual, disponível tanto no painel
+do dealer quanto reaproveitado pelo fluxo de revisão manual (`resolve.ts`) — toda nova linha em
+`credit_decisions` tenta gerar parecer, seja do motor automático ou de uma decisão humana.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

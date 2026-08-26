@@ -20,13 +20,15 @@ import { createSessionToken, SESSION_COOKIE_NAME } from '../_lib/auth'
 import { mockReq, mockRes } from '../_lib/testHttp'
 
 /**
- * Exercita a esteira inteira ponta a ponta (Fases 0-3), chamando os
+ * Exercita a esteira inteira ponta a ponta (Fases 0-4), chamando os
  * handlers diretamente (sem servidor HTTP real) contra o mesmo PGlite em
  * memória. O SDK da Anthropic é mockado — nunca chama a API real em CI —
- * simulando uma extração de documento limpa e de alta confiança. `fetch`
- * global também é mockado pra nunca bater na BrasilAPI de verdade — a
- * consulta FIPE degrada pra `null` (caminho real e testado, ver
- * `fipe.test.ts` pra cobertura da cadeia de chamadas em si).
+ * respondendo de forma diferente pra cada ferramenta (extração de
+ * documento vs. parecer de risco, já que os dois pontos de integração de
+ * IA usam o mesmo client mockado neste teste). `fetch` global também é
+ * mockado pra nunca bater na BrasilAPI de verdade — a consulta FIPE
+ * degrada pra `null` (caminho real e testado, ver `fipe.test.ts` pra
+ * cobertura da cadeia de chamadas em si).
  */
 describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', () => {
   const originalBureauScenario = process.env.MOCK_BUREAU_SCENARIO
@@ -48,20 +50,44 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 } as Response))
     createMock.mockReset()
-    createMock.mockResolvedValue({
-      model: 'claude-opus-5',
-      content: [
-        {
-          type: 'tool_use',
-          id: 't1',
-          name: 'extract_document_fields',
-          input: {
-            fields: { nome: 'Ciclano de Teste', rendaMensalDeclarada: '10000' },
-            confidence: 0.95,
-            issues: [],
-          },
-        },
-      ],
+    createMock.mockImplementation((params: { tools?: { name: string }[] }) => {
+      const toolName = params.tools?.[0]?.name
+      if (toolName === 'extract_document_fields') {
+        return Promise.resolve({
+          model: 'claude-opus-5',
+          content: [
+            {
+              type: 'tool_use',
+              id: 't1',
+              name: toolName,
+              input: {
+                fields: { nome: 'Ciclano de Teste', rendaMensalDeclarada: '10000' },
+                confidence: 0.95,
+                issues: [],
+              },
+            },
+          ],
+        })
+      }
+      if (toolName === 'write_risk_narrative') {
+        return Promise.resolve({
+          model: 'claude-opus-5',
+          content: [
+            {
+              type: 'tool_use',
+              id: 't2',
+              name: toolName,
+              input: {
+                dealerNarrative:
+                  'Score alto, DTI baixo, sem restrições — aprovação dentro da regra.',
+                applicantNarrative:
+                  'Sua proposta foi aprovada! Em breve enviaremos os próximos passos.',
+              },
+            },
+          ],
+        })
+      }
+      throw new Error(`ferramenta inesperada no mock do Claude: ${String(toolName)}`)
     })
   })
 
@@ -170,7 +196,14 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
       decisionRes,
     )
     expect(decisionRes.statusCode).toBe(201)
-    expect((decisionRes.body as { outcome: string }).outcome).toBe('approved')
+    const decisionBody = decisionRes.body as {
+      outcome: string
+      riskNarrativeDealer: string | null
+      riskNarrativeApplicant: string | null
+    }
+    expect(decisionBody.outcome).toBe('approved')
+    expect(decisionBody.riskNarrativeDealer).toContain('Score alto')
+    expect(decisionBody.riskNarrativeApplicant).toContain('aprovada')
 
     const offerRes = mockRes()
     await offerHandler(
@@ -198,6 +231,14 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
     expect(detail.applicant.fullName).toBe('Ciclano de Teste')
     expect(detail.documents[0]?.extraction?.status).toBe('auto_accepted')
     expect(detail.documents[0]?.extraction?.fields.nome).toBe('Ciclano de Teste')
+
+    const clientViewAfterRes = mockRes()
+    await clientViewHandler(mockReq(`/api/client/${token}`), clientViewAfterRes)
+    const clientViewAfter = clientViewAfterRes.body as {
+      decision: { outcome: string; riskNarrativeApplicant: string | null } | null
+    }
+    expect(clientViewAfter.decision?.outcome).toBe('approved')
+    expect(clientViewAfter.decision?.riskNarrativeApplicant).toContain('aprovada')
   })
 
   it('quando a extração precisa de revisão, a esteira para em documents_review_required até o dealer resolver', async () => {

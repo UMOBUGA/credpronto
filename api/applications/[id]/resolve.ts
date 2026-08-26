@@ -4,6 +4,7 @@ import { getDb } from '../../_lib/db'
 import { applications, creditDecisions } from '../../_lib/schema'
 import { requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
+import { generateAndSaveNarrative } from '../../_lib/riskNarrative'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 const bodySchema = z.object({ outcome: z.enum(['approved', 'denied']) })
@@ -67,7 +68,14 @@ const handler: Handler = async (req, res) => {
     actorId: user.id,
   })
 
-  sendJson(res, 200, decision)
+  await generateAndSaveNarrative(db, decision!.id)
+  const [decisionWithNarrative] = await db
+    .select()
+    .from(creditDecisions)
+    .where(eq(creditDecisions.id, decision!.id))
+    .limit(1)
+
+  sendJson(res, 200, decisionWithNarrative)
 }
 
 export default handler

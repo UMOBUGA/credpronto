@@ -47,6 +47,11 @@ export default function ApplicationDetailPage() {
     onSuccess: invalidate,
   })
 
+  const retryNarrative = useMutation({
+    mutationFn: () => apiFetch(`/api/applications/${id}/narrative`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+
   if (isLoading || !data) return <div className="page">Carregando…</div>
 
   const portalUrl = `${window.location.origin}/portal/${data.clientPortalToken}`
@@ -156,8 +161,15 @@ export default function ApplicationDetailPage() {
         <section className="detail-section">
           <h2>Decisão</h2>
           <p>{STATUS_LABELS[data.latestDecision.outcome]}</p>
-          {data.latestDecision.riskNarrativeDealer && (
+          {data.latestDecision.riskNarrativeDealer ? (
             <p>{data.latestDecision.riskNarrativeDealer}</p>
+          ) : (
+            <>
+              <p>Parecer de IA ainda não disponível.</p>
+              <button onClick={() => retryNarrative.mutate()} disabled={retryNarrative.isPending}>
+                {retryNarrative.isPending ? 'Gerando…' : 'Gerar parecer'}
+              </button>
+            </>
           )}
         </section>
       )}

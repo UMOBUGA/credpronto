@@ -6,11 +6,27 @@ vi.mock('@anthropic-ai/sdk', () => ({
   },
 }))
 
-import { extractDocument, ExtractionError } from './claude'
+import { ClaudeToolCallError, extractDocument, generateNarrative } from './claude'
+import type { DecisionResult } from './decision'
+
+const SAMPLE_FACTORS: DecisionResult['factors'] = {
+  bureauScore: 800,
+  hasBureauRestriction: false,
+  requestedAmount: 20000,
+  monthlyIncomeDeclared: 10000,
+  requestedTermMonths: 48,
+  vehicleRestrictionFound: false,
+  fipeValue: 60000,
+  antifraudRiskScore: 0,
+  antifraudFlags: [],
+  debtToIncome: 0.05,
+  loanToValue: 0.33,
+}
 
 /**
  * Nunca chama a API real — o SDK é mockado inteiro. Cobre os quatro casos
- * que o plano da Fase 2 pede: limpo, baixa confiança, malformado, erro.
+ * que o plano pede pra cada ponto de integração: limpo, baixa
+ * confiança/conteúdo válido, malformado, erro.
  */
 describe('extractDocument', () => {
   beforeEach(() => {
@@ -56,18 +72,18 @@ describe('extractDocument', () => {
     expect(result.issues).toEqual(['imagem borrada'])
   })
 
-  it('lança ExtractionError quando o modelo não usa a ferramenta', async () => {
+  it('lança ClaudeToolCallError quando o modelo não usa a ferramenta', async () => {
     createMock.mockResolvedValue({
       model: 'claude-opus-5',
       content: [{ type: 'text', text: 'não consigo ler essa imagem' }],
     })
 
     await expect(extractDocument('base64-fake', 'image/jpeg', 'rg')).rejects.toThrow(
-      ExtractionError,
+      ClaudeToolCallError,
     )
   })
 
-  it('lança ExtractionError quando a saída da ferramenta não bate com o schema esperado', async () => {
+  it('lança ClaudeToolCallError quando a saída da ferramenta não bate com o schema esperado', async () => {
     createMock.mockResolvedValue({
       model: 'claude-opus-5',
       content: [
@@ -81,15 +97,77 @@ describe('extractDocument', () => {
     })
 
     await expect(extractDocument('base64-fake', 'image/jpeg', 'rg')).rejects.toThrow(
-      ExtractionError,
+      ClaudeToolCallError,
     )
   })
 
-  it('lança ExtractionError quando a chamada à API falha', async () => {
+  it('lança ClaudeToolCallError quando a chamada à API falha', async () => {
     createMock.mockRejectedValue(new Error('rede fora do ar'))
 
     await expect(extractDocument('base64-fake', 'image/jpeg', 'rg')).rejects.toThrow(
-      ExtractionError,
+      ClaudeToolCallError,
+    )
+  })
+})
+
+describe('generateNarrative', () => {
+  beforeEach(() => {
+    createMock.mockReset()
+  })
+
+  it('retorna as duas versões do parecer quando a resposta é limpa', async () => {
+    createMock.mockResolvedValue({
+      model: 'claude-opus-5',
+      content: [
+        {
+          type: 'tool_use',
+          id: 'n1',
+          name: 'write_risk_narrative',
+          input: {
+            dealerNarrative: 'Score alto, DTI baixo, sem restrições — aprovação dentro da regra.',
+            applicantNarrative:
+              'Sua proposta foi aprovada! Em breve enviaremos os próximos passos.',
+          },
+        },
+      ],
+    })
+
+    const result = await generateNarrative(SAMPLE_FACTORS, 'approved')
+
+    expect(result.dealerNarrative).toContain('Score alto')
+    expect(result.applicantNarrative).toContain('aprovada')
+  })
+
+  it('lança ClaudeToolCallError quando o modelo não usa a ferramenta', async () => {
+    createMock.mockResolvedValue({
+      model: 'claude-opus-5',
+      content: [{ type: 'text', text: 'aqui está o parecer em texto livre...' }],
+    })
+
+    await expect(generateNarrative(SAMPLE_FACTORS, 'approved')).rejects.toThrow(ClaudeToolCallError)
+  })
+
+  it('lança ClaudeToolCallError quando a saída não bate com o schema esperado', async () => {
+    createMock.mockResolvedValue({
+      model: 'claude-opus-5',
+      content: [
+        {
+          type: 'tool_use',
+          id: 'n2',
+          name: 'write_risk_narrative',
+          input: { dealerNarrative: '' },
+        },
+      ],
+    })
+
+    await expect(generateNarrative(SAMPLE_FACTORS, 'denied')).rejects.toThrow(ClaudeToolCallError)
+  })
+
+  it('lança ClaudeToolCallError quando a chamada à API falha', async () => {
+    createMock.mockRejectedValue(new Error('rede fora do ar'))
+
+    await expect(generateNarrative(SAMPLE_FACTORS, 'manual_review')).rejects.toThrow(
+      ClaudeToolCallError,
     )
   })
 })

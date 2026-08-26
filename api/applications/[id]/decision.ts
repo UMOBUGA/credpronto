@@ -12,6 +12,7 @@ import { decryptField } from '../../_lib/crypto'
 import { requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
 import { decide } from '../../_lib/decision'
+import { generateAndSaveNarrative } from '../../_lib/riskNarrative'
 import { pathSegment, sendJson, type Handler } from '../../_lib/http'
 
 async function handleGet(
@@ -29,9 +30,14 @@ async function handleGet(
 }
 
 /**
- * Roda o motor determinístico (`decision.ts::decide`) — nunca a IA. A IA só
- * entra na Fase 4, gerando um parecer que EXPLICA esta decisão depois de
- * tomada, nunca a substitui.
+ * Roda o motor determinístico (`decision.ts::decide`) — nunca a IA. Só
+ * depois da decisão estar persistida é que tenta gerar o parecer
+ * (`generateAndSaveNarrative`), que EXPLICA a decisão, nunca a substitui.
+ * A chamada de parecer roda de forma síncrona aqui (mesma justificativa da
+ * Fase 2: funções Vercel Node não têm um jeito portável de continuar
+ * trabalhando depois de `res.end()`), mas nunca falha a requisição — se a
+ * IA não responder, a decisão persiste sem parecer e o dealer pode tentar
+ * de novo via `POST /api/applications/[id]/narrative`.
  */
 async function handlePost(
   res: Parameters<Handler>[1],
@@ -134,7 +140,14 @@ async function handlePost(
 
   await transition(db, applicationId, result.outcome, actor)
 
-  sendJson(res, 201, decision)
+  await generateAndSaveNarrative(db, decision!.id)
+  const [decisionWithNarrative] = await db
+    .select()
+    .from(creditDecisions)
+    .where(eq(creditDecisions.id, decision!.id))
+    .limit(1)
+
+  sendJson(res, 201, decisionWithNarrative)
 }
 
 const handler: Handler = async (req, res) => {

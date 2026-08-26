@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { getDb } from '../_lib/db'
-import { applicants, documents } from '../_lib/schema'
+import { applicants, creditDecisions, documents } from '../_lib/schema'
 import { requireApplicationByToken } from '../_lib/auth'
 import { lastPathSegment, sendJson, type Handler } from '../_lib/http'
 
@@ -27,6 +27,18 @@ const handler: Handler = async (req, res) => {
     .from(documents)
     .where(eq(documents.applicationId, application.id))
 
+  // Só o parecer em linguagem simples, nunca o técnico (fatores/scores
+  // internos são informação do dealer, não do cliente).
+  const [decision] = await db
+    .select({
+      outcome: creditDecisions.outcome,
+      riskNarrativeApplicant: creditDecisions.riskNarrativeApplicant,
+    })
+    .from(creditDecisions)
+    .where(eq(creditDecisions.applicationId, application.id))
+    .orderBy(desc(creditDecisions.decidedAt))
+    .limit(1)
+
   sendJson(res, 200, {
     status: application.status,
     vehicle: {
@@ -39,6 +51,7 @@ const handler: Handler = async (req, res) => {
     requestedTermMonths: application.requestedTermMonths,
     hasSubmittedDetails: Boolean(applicant?.birthDateEncrypted),
     documents: docs,
+    decision: decision ?? null,
   })
 }
 

@@ -12,6 +12,16 @@ interface ClientView {
   requestedTermMonths: number
   hasSubmittedDetails: boolean
   documents: DocumentSummary[]
+  decision: {
+    outcome: 'approved' | 'denied' | 'manual_review'
+    riskNarrativeApplicant: string | null
+  } | null
+}
+
+const OUTCOME_LABELS: Record<'approved' | 'denied' | 'manual_review', string> = {
+  approved: 'Sua proposta foi aprovada',
+  denied: 'Sua proposta não foi aprovada',
+  manual_review: 'Sua proposta está em análise pela equipe da loja',
 }
 
 function getTokenFromPath(): string | null {
@@ -65,6 +75,13 @@ export default function App() {
         <PersonalDataForm token={token} onSubmitted={invalidate} />
       ) : (
         <DocumentsSection token={token} documents={data.documents} onUploaded={invalidate} />
+      )}
+
+      {data.decision && (
+        <div className="client-card">
+          <h2>{OUTCOME_LABELS[data.decision.outcome]}</h2>
+          {data.decision.riskNarrativeApplicant && <p>{data.decision.riskNarrativeApplicant}</p>}
+        </div>
       )}
     </div>
   )
