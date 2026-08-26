@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -29,6 +29,26 @@ export async function putDocument(buffer: Buffer, extension: string): Promise<St
 
 export async function getDocument(storageKey: string): Promise<Buffer> {
   return process.env.BLOB_READ_WRITE_TOKEN ? getBlob(storageKey) : getLocal(storageKey)
+}
+
+/**
+ * Usado só por `api/cron/retention-sweep.ts` (Fase 6) — apaga o arquivo por
+ * trás de um documento cuja proposta entrou na janela de anonimização.
+ * Best-effort: um arquivo já ausente (ex.: sweep rodado 2x) não deve travar
+ * a varredura das outras propostas, então erros são engolidos aqui, igual
+ * ao padrão de `src/lib/db.ts` do painel-do-ar para cache best-effort.
+ */
+export async function deleteDocument(storageKey: string): Promise<void> {
+  try {
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const { del } = await import('@vercel/blob')
+      await del(storageKey)
+    } else {
+      await rm(path.join(LOCAL_DIR, storageKey), { force: true })
+    }
+  } catch {
+    // best-effort, ver comentário acima
+  }
 }
 
 async function putLocal(buffer: Buffer, extension: string): Promise<StoredFile> {

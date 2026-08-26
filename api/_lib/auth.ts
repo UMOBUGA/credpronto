@@ -135,6 +135,27 @@ export async function requireDealerSession(
   return user
 }
 
+/**
+ * Igual a `requireDealerSession`, mas também barra papéis fora da lista —
+ * usado por `applications/[id]/reveal.ts` (Fase 6), restrito a
+ * admin/manager: um analyst pode operar a esteira sem poder revelar CPF/
+ * renda em claro.
+ */
+export async function requireDealerRole(
+  req: IncomingMessage,
+  res: ServerResponse,
+  db: Db,
+  allowedRoles: DealerUser['role'][],
+): Promise<DealerUser | null> {
+  const user = await requireDealerSession(req, res, db)
+  if (!user) return null
+  if (!allowedRoles.includes(user.role)) {
+    sendJson(res, 403, { error: 'forbidden' })
+    return null
+  }
+  return user
+}
+
 export async function requireApplicationByToken(
   res: ServerResponse,
   db: Db,

@@ -5,6 +5,7 @@ import { applicants, consentRecords } from '../../_lib/schema'
 import { encryptField } from '../../_lib/crypto'
 import { requireApplicationByToken } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
+import { enforceRateLimit } from '../../_lib/rateLimit'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 /** Versão do texto de política mostrado ao cliente no momento do consentimento. */
@@ -21,9 +22,18 @@ const bodySchema = z.object({
   }),
   monthlyIncomeDeclared: z.number().positive(),
   consent: z.literal(true),
+  // Granulares (Fase 6) — distintos do consentimento geral de tratamento de
+  // dado acima, que continua obrigatório. Nenhum dos dois bloqueia o envio:
+  // não autorizar bureau/parecer de IA é uma escolha legítima do titular,
+  // só limita o que a esteira consegue fazer depois (ver `decision.ts`/
+  // `riskNarrative.ts`, que já toleram ausência de dado por design).
+  consentBureauCheck: z.boolean().default(false),
+  consentAiNarrativeShare: z.boolean().default(false),
 })
 
 const handler: Handler = async (req, res) => {
+  if (!enforceRateLimit(req, res, 'client.submit', 20, 60 * 1000)) return
+
   const db = await getDb()
   const token = pathSegment(req, 1)
   const application = await requireApplicationByToken(res, db, token)
@@ -50,12 +60,19 @@ const handler: Handler = async (req, res) => {
     })
     .where(eq(applicants.id, application.applicantId))
 
-  await db.insert(consentRecords).values({
-    applicantId: application.applicantId,
-    applicationId: application.id,
-    consentType: 'data_processing',
-    privacyPolicyVersion: PRIVACY_POLICY_VERSION,
-  })
+  const grantedConsentTypes: Array<'data_processing' | 'bureau_check' | 'ai_narrative_share'> = [
+    'data_processing',
+    ...(parsed.data.consentBureauCheck ? (['bureau_check'] as const) : []),
+    ...(parsed.data.consentAiNarrativeShare ? (['ai_narrative_share'] as const) : []),
+  ]
+  await db.insert(consentRecords).values(
+    grantedConsentTypes.map((consentType) => ({
+      applicantId: application.applicantId,
+      applicationId: application.id,
+      consentType,
+      privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+    })),
+  )
 
   await transition(db, application.id, 'client_submitted', {
     actorType: 'applicant',

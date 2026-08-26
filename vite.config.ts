@@ -27,8 +27,11 @@ export default defineConfig({
     // sequência de propósito (decrypt/transição de estado precisam ser
     // sequenciais, ver comentários em api/applications/[id].ts e
     // api/bureau/check.ts) — sob instrumentação de cobertura (v8) isso passa
-    // dos 10s padrão em alguns arquivos maiores.
-    testTimeout: 20000,
+    // dos 10s padrão em alguns arquivos maiores. Subiu de 20s pra 40s na
+    // Fase 6: mais arquivos de teste rodando em paralelo (reveal, audit-log,
+    // os dois crons) aumenta a contenção de CPU da própria instrumentação,
+    // não o tempo de execução de cada teste isoladamente.
+    testTimeout: 40000,
     css: false,
     coverage: {
       provider: 'v8',

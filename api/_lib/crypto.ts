@@ -73,17 +73,26 @@ export interface DecryptFieldContext {
   entityId: string
   field: string
   applicationId?: string
+  /**
+   * Sobrescreve o rótulo padrão `'pii.decrypted'` — usado por
+   * `api/applications/[id]/reveal.ts` (Fase 6) pra marcar `'pii.revealed'`:
+   * uma ação humana deliberada de "clicar em revelar" na UI, distinta de
+   * uma decriptação interna rotineira (ex.: calcular DTI durante a
+   * decisão). Mesma trilha de auditoria, rótulo diferente.
+   */
+  action?: string
 }
 
 /**
  * Único caminho de leitura de campo cifrado. Sempre grava uma linha em
- * `audit_log` (`action: 'pii.decrypted'`) — auditoria de acesso a PII é uma
- * propriedade estrutural do código, não uma convenção que dá pra esquecer.
+ * `audit_log` (`action: 'pii.decrypted'` por padrão) — auditoria de acesso
+ * a PII é uma propriedade estrutural do código, não uma convenção que dá
+ * pra esquecer.
  */
 export async function decryptField(payload: string, ctx: DecryptFieldContext): Promise<string> {
   const plaintext = decryptRaw(payload)
   await logAction(ctx.db, ctx.actor, {
-    action: 'pii.decrypted',
+    action: ctx.action ?? 'pii.decrypted',
     entityType: ctx.entityType,
     entityId: ctx.entityId,
     applicationId: ctx.applicationId,

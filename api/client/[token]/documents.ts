@@ -5,6 +5,7 @@ import { putDocument } from '../../_lib/storage'
 import { requireApplicationByToken } from '../../_lib/auth'
 import { logAction } from '../../_lib/audit'
 import { runExtraction } from '../../_lib/documentExtraction'
+import { enforceRateLimit } from '../../_lib/rateLimit'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 const ALLOWED_STATUSES = new Set([
@@ -39,6 +40,8 @@ const bodySchema = z.object({
  * final da extração na mesma requisição, sem precisar de polling.
  */
 const handler: Handler = async (req, res) => {
+  if (!enforceRateLimit(req, res, 'client.documents', 20, 60 * 1000)) return
+
   const db = await getDb()
   const token = pathSegment(req, 1)
   const application = await requireApplicationByToken(res, db, token)

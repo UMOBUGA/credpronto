@@ -17,14 +17,17 @@ import { generateClientPortalToken, hashPassword } from './auth'
  * uma única instância por arquivo de teste — várias chamadas no mesmo
  * arquivo compartilham o banco em memória.
  */
-export async function seedDealerUser(db: Db): Promise<DealerUser> {
+export async function seedDealerUser(
+  db: Db,
+  role: DealerUser['role'] = 'admin',
+): Promise<DealerUser> {
   const [user] = await db
     .insert(dealerUsers)
     .values({
       name: 'Dealer de teste',
       email: `dealer-${randomUUID()}@example.test`,
       passwordHash: hashPassword('senha-teste'),
-      role: 'admin',
+      role,
     })
     .returning()
   return user!

@@ -45,6 +45,13 @@ export const applicants = pgTable('applicants', {
   emailEncrypted: text('email_encrypted').notNull(),
   addressEncrypted: text('address_encrypted'),
   monthlyIncomeDeclaredEncrypted: text('monthly_income_declared_encrypted'),
+  // Preenchido por `api/cron/retention-sweep.ts` (Fase 6) quando a
+  // varredura de retenção sobrescreve os campos com um valor sentinela —
+  // marca "esse applicant já foi anonimizado" pra não processar de novo, e
+  // também é a razão de `cpfHash` ser randomizado na anonimização: sem
+  // isso, uma proposta nova de verdade da mesma pessoa colidiria com a
+  // linha já esvaziada.
+  anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

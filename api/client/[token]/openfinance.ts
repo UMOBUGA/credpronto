@@ -1,15 +1,18 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '../../_lib/db'
-import { applicants, openfinanceConsents, openfinanceData } from '../../_lib/schema'
+import { applicants, consentRecords, openfinanceConsents, openfinanceData } from '../../_lib/schema'
 import { decryptField, encryptField } from '../../_lib/crypto'
 import { requireApplicationByToken } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
 import { getOpenFinanceClient } from '../../_lib/openfinance'
+import { enforceRateLimit } from '../../_lib/rateLimit'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 const bodySchema = z.object({ decision: z.enum(['authorize', 'deny']) })
 const SCOPES = ['accounts', 'transactions']
+/** Mesma versão de política usada pelos outros consentimentos do portal do cliente. */
+const PRIVACY_POLICY_VERSION = '2026-08-26'
 
 /**
  * Cria o consentimento e — se autorizado — já busca e salva o dado numa
@@ -23,6 +26,8 @@ const SCOPES = ['accounts', 'transactions']
  * distintas).
  */
 const handler: Handler = async (req, res) => {
+  if (!enforceRateLimit(req, res, 'client.openfinance', 20, 60 * 1000)) return
+
   const db = await getDb()
   const token = pathSegment(req, 1)
   const application = await requireApplicationByToken(res, db, token)
@@ -110,6 +115,13 @@ const handler: Handler = async (req, res) => {
         payloadEncrypted: encryptField(String(data.monthlyIncomeEstimate)),
       },
     ])
+
+    await db.insert(consentRecords).values({
+      applicantId: application.applicantId,
+      applicationId: application.id,
+      consentType: 'openfinance_share',
+      privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+    })
 
     await transition(db, application.id, 'openfinance_authorized', actor)
     sendJson(res, 200, { status: 'openfinance_authorized' })

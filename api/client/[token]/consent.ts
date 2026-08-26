@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getDb } from '../../_lib/db'
 import { consentRecords } from '../../_lib/schema'
 import { requireApplicationByToken } from '../../_lib/auth'
+import { enforceRateLimit } from '../../_lib/rateLimit'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 const PRIVACY_POLICY_VERSION = '2026-08-26'
@@ -18,6 +19,8 @@ const bodySchema = z.object({
 })
 
 const handler: Handler = async (req, res) => {
+  if (!enforceRateLimit(req, res, 'client.consent', 30, 60 * 1000)) return
+
   const db = await getDb()
   const token = pathSegment(req, 1)
   const application = await requireApplicationByToken(res, db, token)

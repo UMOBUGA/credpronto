@@ -22,12 +22,35 @@ oferta de financiamento.
 
 ```bash
 npm install
-npm run db:seed    # cria o usuário dealer@credpronto.dev / credpronto123
+npm run db:seed    # cria dealer@credpronto.dev / credpronto123 + 4 propostas de exemplo
 npm run dev
 ```
 
 Sem nenhuma variável de ambiente definida, o backend roda contra um Postgres embutido (PGlite)
 local — zero configuração. Acesse `http://localhost:5173/` para o painel da loja.
+
+### Roteiro de demonstração
+
+Depois do `npm run db:seed`, logue com `dealer@credpronto.dev` / `credpronto123` e a fila já vem
+com 4 propostas em estados diferentes:
+
+1. **Proposta em `manual_review`** — abra o detalhe: bureau/veículo/antifraude já rodaram, um
+   sinal de antifraude forçou revisão humana. Clique em "Aprovar manualmente" ou "Negar
+   manualmente" pra ver `resolve.ts` gerar uma nova linha em `credit_decisions` e (com
+   `ANTHROPIC_API_KEY` configurada) um parecer de IA de verdade.
+2. **Proposta em `offer_created`** — CPF e renda aparecem mascarados por padrão; clique em
+   "Revelar" (usuário seed é `admin`) e note a nova linha `pii.revealed` na "Trilha de auditoria"
+   no fim da página, distinta das linhas `pii.decrypted` rotineiras.
+3. **Proposta em `denied`** — bureau simulado com restrição ativa; a "Trilha de auditoria" mostra
+   a sequência completa de decrypts que a tela de detalhe disparou.
+4. **Proposta em `link_sent`** — copie o link do portal do cliente (`/portal/:token` na própria
+   URL) e complete o fluxo do zero: dados pessoais (com os 3 checkboxes de consentimento
+   granular), upload de documento (extração por IA se `ANTHROPIC_API_KEY` estiver configurada,
+   senão cai graciosamente em `failed` com retry manual), Open Finance simulado, checagens,
+   decisão, oferta.
+5. **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
+   mostra o que seria anonimizado sem escrever nada; sem `dryRun`, anonimiza de verdade quem já
+   passou da janela de retenção (nenhuma das 4 propostas de exemplo qualifica — são recém-criadas).
 
 ## Comandos
 
@@ -57,4 +80,5 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 3 — anti-fraude e consulta veicular (FIPE real via BrasilAPI + restrição simulada)
 - ✅ Fase 4 — parecer de risco via IA (Claude), versão técnica e versão para o cliente
 - ✅ Fase 5 — Open Finance Brasil simulado (integração real exige autorização do Bacen — ver CLAUDE.md)
-- ⬜ Fase 6 — hardening de LGPD (mascaramento, retenção, trilha de auditoria completa) e polimento
+- ✅ Fase 6 — hardening de LGPD (consentimento granular, mascaramento/revelação de PII, trilha de
+  auditoria visível, retenção com anonimização, rate limiting) e polimento

@@ -67,11 +67,18 @@ async function handleGet(
 
   // Sequencial de propósito: PGlite é uma conexão única, e cada decrypt
   // grava em audit_log — melhor não competir por escrita concorrente aqui.
+  //
+  // CPF e renda declarada NÃO são decriptados aqui (Fase 6) — ficam mascarados
+  // por padrão; só `POST /api/applications/[id]/reveal` (restrito a
+  // admin/manager, ver `auth.ts`) decripta e grava a ação distinta
+  // `pii.revealed` em vez do genérico `pii.decrypted`. Nome/telefone/e-mail
+  // continuam abertos aqui porque já aparecem sem mascaramento em outras
+  // telas do dealer (ex.: fila de propostas) e não são, por si só, os campos
+  // mais sensíveis do cadastro.
   const fullName = await decryptField(applicant.fullNameEncrypted, {
     ...baseCtx,
     field: 'fullName',
   })
-  const cpf = await decryptField(applicant.cpfEncrypted, { ...baseCtx, field: 'cpf' })
   const phone = await decryptField(applicant.phoneEncrypted, { ...baseCtx, field: 'phone' })
   const email = await decryptField(applicant.emailEncrypted, { ...baseCtx, field: 'email' })
   const birthDate = applicant.birthDateEncrypted
@@ -80,14 +87,8 @@ async function handleGet(
   const address = applicant.addressEncrypted
     ? JSON.parse(await decryptField(applicant.addressEncrypted, { ...baseCtx, field: 'address' }))
     : null
-  const monthlyIncomeDeclared = applicant.monthlyIncomeDeclaredEncrypted
-    ? Number(
-        await decryptField(applicant.monthlyIncomeDeclaredEncrypted, {
-          ...baseCtx,
-          field: 'monthlyIncomeDeclared',
-        }),
-      )
-    : null
+  const cpfMasked = '•••.•••.•••-••'
+  const hasMonthlyIncomeDeclared = applicant.monthlyIncomeDeclaredEncrypted !== null
 
   const docRows = await db
     .select()
@@ -187,28 +188,33 @@ async function handleGet(
     }
   }
 
-  sendJson(res, 200, {
-    ...application,
-    applicant: {
-      id: applicant.id,
-      fullName,
-      cpf,
-      phone,
-      email,
-      birthDate,
-      address,
-      monthlyIncomeDeclared,
+  sendJson(
+    res,
+    200,
+    {
+      ...application,
+      applicant: {
+        id: applicant.id,
+        fullName,
+        cpfMasked,
+        phone,
+        email,
+        birthDate,
+        address,
+        hasMonthlyIncomeDeclared,
+      },
+      documents: docs,
+      latestBureauCheck: latestBureauCheck ?? null,
+      latestVehicleCheck: latestVehicleCheck ?? null,
+      latestAntifraudCheck: latestAntifraudCheck ?? null,
+      latestOpenfinanceConsent: latestOpenfinanceConsent
+        ? { ...latestOpenfinanceConsent, monthlyIncomeEstimate: openfinanceIncomeEstimate }
+        : null,
+      latestDecision: latestDecision ?? null,
+      offers,
     },
-    documents: docs,
-    latestBureauCheck: latestBureauCheck ?? null,
-    latestVehicleCheck: latestVehicleCheck ?? null,
-    latestAntifraudCheck: latestAntifraudCheck ?? null,
-    latestOpenfinanceConsent: latestOpenfinanceConsent
-      ? { ...latestOpenfinanceConsent, monthlyIncomeEstimate: openfinanceIncomeEstimate }
-      : null,
-    latestDecision: latestDecision ?? null,
-    offers,
-  })
+    'no-store',
+  )
 }
 
 async function handlePatch(

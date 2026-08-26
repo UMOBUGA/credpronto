@@ -113,15 +113,31 @@ export interface LoanOfferSummary {
   status: 'draft' | 'sent' | 'accepted' | 'declined'
 }
 
+/**
+ * CPF e renda declarada vêm mascarados por padrão (Fase 6, LGPD) — só
+ * `POST /api/applications/[id]/reveal` (restrito a admin/manager) devolve o
+ * valor em claro, e cada chamada gera uma entrada própria de auditoria.
+ */
 export interface ApplicantDetail {
   id: string
   fullName: string
-  cpf: string
+  cpfMasked: string
   phone: string
   email: string
   birthDate: string | null
   address: { street: string; number: string; city: string; state: string; zip: string } | null
-  monthlyIncomeDeclared: number | null
+  hasMonthlyIncomeDeclared: boolean
+}
+
+export interface AuditLogEntry {
+  id: string
+  occurredAt: string
+  actorType: 'dealer_user' | 'applicant' | 'system' | 'cron'
+  actorId: string | null
+  action: string
+  entityType: string
+  entityId: string
+  metadataJson: Record<string, unknown> | null
 }
 
 export interface ApplicationDetail extends ApplicationSummary {

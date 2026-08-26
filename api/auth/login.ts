@@ -5,6 +5,7 @@ import { dealerUsers } from '../_lib/schema'
 import { createSessionToken, sessionCookieHeader, verifyPassword } from '../_lib/auth'
 import { readJsonBody, sendJson, type Handler } from '../_lib/http'
 import { logAction } from '../_lib/audit'
+import { enforceRateLimit } from '../_lib/rateLimit'
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -12,6 +13,8 @@ const bodySchema = z.object({
 })
 
 const handler: Handler = async (req, res) => {
+  if (!enforceRateLimit(req, res, 'auth.login', 10, 5 * 60 * 1000)) return
+
   const parsed = bodySchema.safeParse(await readJsonBody(req))
   if (!parsed.success) {
     sendJson(res, 400, { error: 'invalid_body' })

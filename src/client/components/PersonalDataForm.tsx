@@ -16,6 +16,8 @@ export function PersonalDataForm({ token, onSubmitted }: Props) {
   const [zip, setZip] = useState('')
   const [monthlyIncome, setMonthlyIncome] = useState('')
   const [consent, setConsent] = useState(false)
+  const [consentBureauCheck, setConsentBureauCheck] = useState(true)
+  const [consentAiNarrativeShare, setConsentAiNarrativeShare] = useState(true)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -26,6 +28,8 @@ export function PersonalDataForm({ token, onSubmitted }: Props) {
           address: { street, number, city, state, zip },
           monthlyIncomeDeclared: Number(monthlyIncome),
           consent: true,
+          consentBureauCheck,
+          consentAiNarrativeShare,
         }),
       }),
     onSuccess: onSubmitted,
@@ -90,8 +94,29 @@ export function PersonalDataForm({ token, onSubmitted }: Props) {
             onChange={(e) => setConsent(e.target.checked)}
             required
           />
-          Autorizo o uso dos meus dados para análise de crédito, conforme a política de privacidade.
+          Autorizo o uso dos meus dados para análise de crédito, conforme a política de privacidade
+          (obrigatório).
         </label>
+        <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={consentBureauCheck}
+            onChange={(e) => setConsentBureauCheck(e.target.checked)}
+          />
+          Autorizo a consulta ao meu histórico de crédito (bureau) para esta análise.
+        </label>
+        <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={consentAiNarrativeShare}
+            onChange={(e) => setConsentAiNarrativeShare(e.target.checked)}
+          />
+          Autorizo receber uma explicação da decisão gerada por inteligência artificial.
+        </label>
+        <p className="hint-text">
+          As duas últimas autorizações são opcionais e não afetam sua elegibilidade ao
+          financiamento.
+        </p>
         {mutation.isError && (
           <p className="form-error">Não foi possível enviar. Tente novamente.</p>
         )}

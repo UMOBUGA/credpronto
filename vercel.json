@@ -7,6 +7,10 @@
     { "source": "/portal/:token*", "destination": "/client.html" },
     { "source": "/((?!api/|assets/|portal/).*)", "destination": "/dealer.html" }
   ],
+  "crons": [
+    { "path": "/api/cron/expire-links", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/retention-sweep", "schedule": "0 6 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { getDb } from '../_lib/db'
 import { applicants, creditDecisions, documents } from '../_lib/schema'
 import { requireApplicationByToken } from '../_lib/auth'
+import { enforceRateLimit } from '../_lib/rateLimit'
 import { lastPathSegment, sendJson, type Handler } from '../_lib/http'
 
 /**
@@ -11,6 +12,8 @@ import { lastPathSegment, sendJson, type Handler } from '../_lib/http'
  * não precisa reexibir o que o próprio cliente digitou.
  */
 const handler: Handler = async (req, res) => {
+  if (!enforceRateLimit(req, res, 'client.token', 60, 60 * 1000)) return
+
   const db = await getDb()
   const token = lastPathSegment(req)
   const application = await requireApplicationByToken(res, db, token)
@@ -39,20 +42,25 @@ const handler: Handler = async (req, res) => {
     .orderBy(desc(creditDecisions.decidedAt))
     .limit(1)
 
-  sendJson(res, 200, {
-    status: application.status,
-    vehicle: {
-      make: application.vehicleMake,
-      model: application.vehicleModel,
-      year: application.vehicleYear,
-      price: application.vehiclePrice,
+  sendJson(
+    res,
+    200,
+    {
+      status: application.status,
+      vehicle: {
+        make: application.vehicleMake,
+        model: application.vehicleModel,
+        year: application.vehicleYear,
+        price: application.vehiclePrice,
+      },
+      requestedAmount: application.requestedAmount,
+      requestedTermMonths: application.requestedTermMonths,
+      hasSubmittedDetails: Boolean(applicant?.birthDateEncrypted),
+      documents: docs,
+      decision: decision ?? null,
     },
-    requestedAmount: application.requestedAmount,
-    requestedTermMonths: application.requestedTermMonths,
-    hasSubmittedDetails: Boolean(applicant?.birthDateEncrypted),
-    documents: docs,
-    decision: decision ?? null,
-  })
+    'no-store',
+  )
 }
 
 export default handler

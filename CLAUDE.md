@@ -124,6 +124,75 @@ legítimo e não bloqueia. `decision.ts` usa a renda estimada pelo Open Finance 
 um fator: muito abaixo da declarada empurra pra `manual_review` (nunca bloqueia sozinha), ausência
 de dado nunca penaliza.
 
+## Hardening de LGPD e polimento (Fase 6)
+
+**Consentimento granular**: `consent_records` (tabela própria, distinta de `openfinance_consents`
+— "o titular deixou eu processar o dado" vs. "autorizou o banco simulado a compartilhar") é
+gravado em cada passo relevante do portal do cliente, não só uma vez no cadastro:
+`POST /api/client/[token]/submit` grava `data_processing` sempre (checkbox obrigatório) e
+`bureau_check`/`ai_narrative_share` conforme dois checkboxes opcionais adicionais — não autorizar
+os dois últimos não bloqueia o envio, é uma escolha legítima do titular (a esteira não força a
+lógica de bloqueio real hoje: gravar o consentimento é o requisito de LGPD desta fase, condicionar
+o comportamento das checagens a ele ficaria para uma fase futura). `POST
+/api/client/[token]/openfinance` grava `openfinance_share` só quando o cliente de fato autoriza o
+Open Finance simulado. O endpoint genérico `POST /api/client/[token]/consent` (existente desde a
+Fase 1) continua disponível para revogação futura.
+
+**Máscara/revelação de PII**: `api/applications/[id].ts` não decripta mais `cpf` nem
+`monthlyIncomeDeclared` por padrão — devolve `cpfMasked` (constante, já que não há como mostrar
+dígitos parciais sem decriptar) e `hasMonthlyIncomeDeclared` (booleano). Só
+`POST /api/applications/[id]/reveal` (`{ field: 'cpf' | 'monthlyIncomeDeclared' }`) decripta em
+claro, restrito a `admin`/`manager` via `requireDealerRole()` (novo guard em `auth.ts` — um
+`analyst` opera a esteira inteira sem precisar disso). `crypto.ts::DecryptFieldContext` ganhou um
+`action?: string` opcional; `reveal.ts` passa `action: 'pii.revealed'` em vez do `'pii.decrypted'`
+genérico — a trilha de auditoria distingue "sistema decriptou pra calcular algo" de "um humano
+clicou em revelar". Nome/telefone/e-mail continuam abertos no detalhe (já apareciam sem máscara em
+outras telas do dealer e não são, isoladamente, os campos mais sensíveis do cadastro).
+
+**Trilha de auditoria visível**: `GET /api/applications/[id]/audit-log` lista `audit_log` por
+proposta (até 200 linhas, mais recente primeiro), aberto a qualquer papel autenticado — diferente
+de `reveal.ts` — porque `metadataJson` nunca carrega valor de PII por construção (ver
+`audit.ts`), então o próprio log é seguro de mostrar. `AuditLogPanel.tsx` no painel do dealer
+renderiza essa lista; como toda decriptação e toda transição de estado já passavam por
+`logAction()` desde a Fase 1, esta fase não precisou "completar" a auditoria — só expor o que já
+existia.
+
+**Retenção de dado** (`api/cron/retention-sweep.ts`, roda 1x/dia): anonimiza nome/CPF/telefone/
+e-mail/documentos/extrações de propostas paradas há tempo demais num estado terminal —
+`denied`/`expired`/`cancelled`/`offer_declined` (janela curta, `RETENTION_WINDOW_DAYS`, padrão 90
+dias) ou `offer_accepted` (janela própria e mais longa, `RETENTION_WINDOW_ACCEPTED_DAYS`, padrão
+~5 anos, ordem de grandeza de guarda de registro financeiro). CPF/nome/telefone/e-mail são
+sobrescritos com um valor sentinela cifrado (não podem ser `NULL`, são `NOT NULL` no schema) e
+`cpfHash` é randomizado — sem isso, uma proposta nova de verdade da mesma pessoa colidiria com a
+linha já esvaziada (ver comentário em `applicants.anonymizedAt`, `schema.ts`). Guarda de
+segurança real, não hipotética: como `applications/index.ts` reaproveita o mesmo `applicants` por
+`cpfHash` (dedupe de cliente recorrente), o sweep pula um applicant que ainda tenha outra proposta
+em andamento (`skippedActiveSibling`) — anonimizar cedo demais apagaria dado que uma proposta
+irmã ainda precisa. `?dryRun=true` reporta o que seria anonimizado sem escrever nada. Documentos
+são apagados via `storage.ts::deleteDocument()` (best-effort, engole erro — mesmo padrão de
+cache best-effort do painel-do-ar) antes de zerar `applicants`.
+
+`api/cron/expire-links.ts` (roda 1x/dia, antes do sweep) transiciona para `expired` toda proposta
+em `link_sent` cujo token já venceu — sem isso ela nunca chegaria a um estado terminal e nunca
+entraria na janela de retenção. Os dois crons são protegidos por `CRON_SECRET` (mesmo padrão do
+painel-do-ar) e registrados em `vercel.json`.
+
+**Rate limiting**: `api/_lib/rateLimit.ts` é um limitador de janela fixa **em memória de
+processo** — limitação de escopo de portfólio documentada no próprio arquivo: cada instância
+serverless tem seu mapa próprio, sem coordenação entre invocações concorrentes (produção real
+usaria Redis/Upstash). Aplicado a `POST /api/auth/login` (10 tentativas / 5 min por IP) e a todos
+os endpoints de token do cliente — `client/[token].ts` e as rotas `client/[token]/*` — porque o
+token _é_ a autenticação ali (sem senha), então limitar a taxa de adivinhação importa tanto quanto
+no login. `Cache-Control: no-store` foi adicionado às respostas que carregam PII ou token
+(`applications/[id].ts`, `client/[token].ts`, `reveal.ts`, `audit-log.ts`).
+
+**Dado de demonstração**: `scripts/seed.ts` agora também cria 4 propostas sintéticas cobrindo os
+principais estados da esteira (`link_sent`, `manual_review`, `offer_created` com oferta,
+`denied`) — só roda se o banco ainda não tiver nenhuma proposta, pra não duplicar em reruns. São
+inseridas direto nas tabelas (sem passar por `transition()`/`logAction()`): é histórico fabricado
+para a demo funcionar de cara, não uma sequência real de eventos — não faria sentido aparecer na
+trilha de auditoria como se fosse.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.
@@ -141,6 +210,8 @@ de dado nunca penaliza.
   dev/test — simplificação de portfólio; produção real usaria um KMS gerenciado.
 - Documentos no Vercel Blob ficam com `access: 'public'` (URL aleatória, não indexada, mas não
   genuinamente privada) — limitação da API atual do Blob, documentada em `api/_lib/storage.ts`.
+- `api/_lib/rateLimit.ts` é em memória de processo, sem coordenação entre instâncias serverless
+  concorrentes — reduz força bruta óbvia, mas não é a solução de produção (Redis/Upstash).
 - Open Finance Brasil é e sempre será simulado neste projeto — participar de verdade exige a
   instituição ser autorizada pelo Banco Central, uma barreira regulatória que nenhuma sessão de
   código (nem um cadastro de desenvolvedor, nem dinheiro) resolve pra um projeto de portfólio.

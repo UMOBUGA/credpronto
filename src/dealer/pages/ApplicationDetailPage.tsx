@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
@@ -5,11 +6,20 @@ import { formatCpf, formatCurrency } from '@/shared/lib/format'
 import { STATUS_LABELS } from '@/shared/statusLabels'
 import type { ApplicationDetail } from '@/shared/types'
 import { DocumentReviewCard } from '../components/DocumentReviewCard'
+import { AuditLogPanel } from '../components/AuditLogPanel'
+import { useSession } from '../hooks/useSession'
+
+const REVEAL_ROLES = new Set(['admin', 'manager'])
 
 export default function ApplicationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
   const queryKey = ['application', id]
+  const { data: session } = useSession()
+  const canReveal = Boolean(session?.user && REVEAL_ROLES.has(session.user.role))
+
+  const [revealedCpf, setRevealedCpf] = useState<string | null>(null)
+  const [revealedIncome, setRevealedIncome] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey,
@@ -18,6 +28,24 @@ export default function ApplicationDetailPage() {
   })
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
+
+  const revealCpf = useMutation({
+    mutationFn: () =>
+      apiFetch<{ value: string }>(`/api/applications/${id}/reveal`, {
+        method: 'POST',
+        body: JSON.stringify({ field: 'cpf' }),
+      }),
+    onSuccess: (result) => setRevealedCpf(result.value),
+  })
+
+  const revealIncome = useMutation({
+    mutationFn: () =>
+      apiFetch<{ value: number | null }>(`/api/applications/${id}/reveal`, {
+        method: 'POST',
+        body: JSON.stringify({ field: 'monthlyIncomeDeclared' }),
+      }),
+    onSuccess: (result) => setRevealedIncome(result.value),
+  })
 
   const runBureauCheck = useMutation({
     mutationFn: () =>
@@ -69,18 +97,54 @@ export default function ApplicationDetailPage() {
           <dt>Nome</dt>
           <dd>{data.applicant.fullName}</dd>
           <dt>CPF</dt>
-          <dd>{formatCpf(data.applicant.cpf)}</dd>
+          <dd>
+            {revealedCpf ? formatCpf(revealedCpf) : data.applicant.cpfMasked}
+            {canReveal && !revealedCpf && (
+              <button
+                type="button"
+                className="button-link"
+                onClick={() => revealCpf.mutate()}
+                disabled={revealCpf.isPending}
+              >
+                {revealCpf.isPending ? 'Revelando…' : 'Revelar'}
+              </button>
+            )}
+          </dd>
           <dt>Telefone</dt>
           <dd>{data.applicant.phone}</dd>
           <dt>E-mail</dt>
           <dd>{data.applicant.email}</dd>
-          {data.applicant.monthlyIncomeDeclared != null && (
+          {data.applicant.hasMonthlyIncomeDeclared && (
             <>
               <dt>Renda declarada</dt>
-              <dd>{formatCurrency(data.applicant.monthlyIncomeDeclared)}</dd>
+              <dd>
+                {revealedIncome != null ? (
+                  formatCurrency(revealedIncome)
+                ) : (
+                  <>
+                    ••••••
+                    {canReveal && (
+                      <button
+                        type="button"
+                        className="button-link"
+                        onClick={() => revealIncome.mutate()}
+                        disabled={revealIncome.isPending}
+                      >
+                        {revealIncome.isPending ? 'Revelando…' : 'Revelar'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </dd>
             </>
           )}
         </dl>
+        {!canReveal && (
+          <p className="hint-text">
+            CPF e renda ficam mascarados — só admin/manager podem revelar (cada revelação é
+            auditada).
+          </p>
+        )}
       </section>
 
       <section className="detail-section">
@@ -240,6 +304,8 @@ export default function ApplicationDetailPage() {
           </ul>
         </section>
       )}
+
+      <AuditLogPanel applicationId={data.id} />
     </div>
   )
 }

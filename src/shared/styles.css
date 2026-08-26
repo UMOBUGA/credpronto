@@ -78,6 +78,43 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.button-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  padding: 0;
+  margin-left: 8px;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+.audit-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.audit-log-entry {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+.audit-log-entry:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.audit-log-time {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 .auth-page {
   min-height: 100vh;
   display: flex;
