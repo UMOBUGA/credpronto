@@ -142,6 +142,19 @@ export interface ConsentRecordSummary {
   revokedAt: string | null
 }
 
+export type NotificationTemplate = 'link_sent' | 'decision_ready' | 'offer_created'
+
+/**
+ * Só prova que uma notificação foi disparada (Fase 16) — nunca carrega
+ * destinatário/conteúdo, ver `api/_lib/schema.ts::notificationLog`.
+ */
+export interface NotificationLogEntry {
+  id: string
+  template: NotificationTemplate
+  status: 'sent' | 'failed'
+  sentAt: string
+}
+
 export interface AuditLogEntry {
   id: string
   occurredAt: string
@@ -163,4 +176,5 @@ export interface ApplicationDetail extends ApplicationSummary {
   latestDecision: CreditDecisionSummary | null
   offers: LoanOfferSummary[]
   consents: ConsentRecordSummary[]
+  notifications: NotificationLogEntry[]
 }

@@ -15,6 +15,7 @@ import { requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
 import { decide } from '../../_lib/decision'
 import { generateAndSaveNarrative } from '../../_lib/riskNarrative'
+import { notify } from '../../_lib/notifications'
 import { pathSegment, sendJson, type Handler } from '../../_lib/http'
 
 async function handleGet(
@@ -180,6 +181,13 @@ async function handlePost(
     .returning()
 
   await transition(db, applicationId, result.outcome, actor)
+
+  // `manual_review` ainda não é uma decisão pra avisar o cliente — não há
+  // nada de novo pra ele saber até um humano resolver (ver resolve.ts, que
+  // sempre notifica porque só produz approved/denied).
+  if (result.outcome !== 'manual_review') {
+    await notify(db, applicationId, 'decision_ready')
+  }
 
   await generateAndSaveNarrative(db, decision!.id)
   const [decisionWithNarrative] = await db

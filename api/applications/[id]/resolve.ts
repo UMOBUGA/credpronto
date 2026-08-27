@@ -5,6 +5,7 @@ import { applications, creditDecisions } from '../../_lib/schema'
 import { requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
 import { generateAndSaveNarrative } from '../../_lib/riskNarrative'
+import { notify } from '../../_lib/notifications'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 const bodySchema = z.object({ outcome: z.enum(['approved', 'denied']) })
@@ -67,6 +68,7 @@ const handler: Handler = async (req, res) => {
     actorType: 'dealer_user',
     actorId: user.id,
   })
+  await notify(db, applicationId, 'decision_ready')
 
   await generateAndSaveNarrative(db, decision!.id)
   const [decisionWithNarrative] = await db

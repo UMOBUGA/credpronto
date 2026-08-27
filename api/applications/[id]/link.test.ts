@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import linkHandler from './link'
 import { getDb } from '../../_lib/db'
-import { applications, auditLog } from '../../_lib/schema'
+import { applications, auditLog, notificationLog } from '../../_lib/schema'
 import { seedApplicant, seedApplication, seedDealerUser } from '../../_lib/testFixtures'
 import { transition } from '../../_lib/stateMachine'
 import { createSessionToken, SESSION_COOKIE_NAME } from '../../_lib/auth'
@@ -46,6 +46,13 @@ describe('POST /api/applications/[id]/link — reenvio (Fase 12)', () => {
 
     const audited = await db.select().from(auditLog).where(eq(auditLog.entityId, application.id))
     expect(audited.some((row) => row.action === 'application.link_regenerated')).toBe(true)
+
+    const notifications = await db
+      .select()
+      .from(notificationLog)
+      .where(eq(notificationLog.applicationId, application.id))
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0]).toMatchObject({ template: 'link_sent', status: 'sent' })
   })
 
   it('sem sessão recebe 401', async () => {

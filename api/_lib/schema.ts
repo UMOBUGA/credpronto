@@ -386,6 +386,33 @@ export const auditLog = pgTable('audit_log', {
   ipAddress: text('ip_address'),
 })
 
+/**
+ * Notificação simulada por e-mail (Fase 16) — mesma filosofia do bureau/Open
+ * Finance: nenhum provedor real configurado por padrão (ver
+ * `api/_lib/notifications.ts`). Deliberadamente **sem nenhum campo de PII**
+ * (nem e-mail mascarado) — esta tabela só prova que uma notificação foi
+ * disparada para uma proposta, quem quiser o endereço do titular já pode ver
+ * na tela de detalhe (não é mascarado hoje, diferente de CPF/renda).
+ */
+export const notificationChannelEnum = pgEnum('notification_channel', ['email'])
+export const notificationTemplateEnum = pgEnum('notification_template', [
+  'link_sent',
+  'decision_ready',
+  'offer_created',
+])
+export const notificationStatusEnum = pgEnum('notification_status', ['sent', 'failed'])
+
+export const notificationLog = pgTable('notification_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  applicationId: uuid('application_id')
+    .notNull()
+    .references(() => applications.id),
+  channel: notificationChannelEnum('channel').notNull().default('email'),
+  template: notificationTemplateEnum('template').notNull(),
+  status: notificationStatusEnum('status').notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type DealerUser = typeof dealerUsers.$inferSelect
 export type NewDealerUser = typeof dealerUsers.$inferInsert
 export type Applicant = typeof applicants.$inferSelect
@@ -416,3 +443,5 @@ export type ConsentRecord = typeof consentRecords.$inferSelect
 export type NewConsentRecord = typeof consentRecords.$inferInsert
 export type AuditLogEntry = typeof auditLog.$inferSelect
 export type NewAuditLogEntry = typeof auditLog.$inferInsert
+export type NotificationLogEntry = typeof notificationLog.$inferSelect
+export type NewNotificationLogEntry = typeof notificationLog.$inferInsert

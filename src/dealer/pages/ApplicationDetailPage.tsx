@@ -27,6 +27,13 @@ const CONSENT_LABELS: Record<ConsentType, string> = {
   openfinance_share: 'Compartilhamento via Open Finance',
 }
 
+const NOTIFICATION_LABELS: Record<ApplicationDetail['notifications'][number]['template'], string> =
+  {
+    link_sent: 'Link do portal enviado ao cliente',
+    decision_ready: 'Decisão de crédito pronta',
+    offer_created: 'Oferta de financiamento gerada',
+  }
+
 export default function ApplicationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
@@ -218,6 +225,22 @@ export default function ApplicationDetailPage() {
             )
           })}
         </dl>
+      </section>
+
+      <section className="detail-section">
+        <h2>Notificações</h2>
+        {data.notifications.length === 0 ? (
+          <p className="hint-text">Nenhuma notificação disparada ainda.</p>
+        ) : (
+          <ul>
+            {data.notifications.map((notification) => (
+              <li key={notification.id}>
+                {NOTIFICATION_LABELS[notification.template]} — {formatDate(notification.sentAt)}
+                {notification.status === 'failed' && ' (falhou)'}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="detail-section">

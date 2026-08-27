@@ -78,7 +78,10 @@ seed é `admin`) e note a linha `pii.revealed` na "Trilha de auditoria", distint
 Fora da fila:
 
 - **"Nova proposta"** — antes de criar, digite marca/modelo/ano e clique em "Consultar valor
-  FIPE" pra ver o valor de mercado real (BrasilAPI) já na hora de montar a proposta.
+  FIPE" pra ver o valor de mercado real (BrasilAPI) já na hora de montar a proposta. Depois de
+  criar, a seção "Notificações" no detalhe já mostra "Link do portal enviado ao cliente" —
+  nenhuma das 7 propostas de exemplo tem isso por padrão (o seed insere direto nas tabelas, sem
+  passar pelos gatilhos reais); "Reenviar link" adiciona uma segunda linha.
 - **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
   mostra o que seria anonimizado sem escrever nada; sem `dryRun`, anonimiza de verdade quem já
   passou da janela de retenção (nenhuma das 7 propostas de exemplo qualifica de cara — são
@@ -123,3 +126,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 13 — feedback de erro nas ações do dealer, validação real de CPF na criação
 - ✅ Fase 14 — edição de proposta em draft/link_sent/client_submitted
 - ✅ Fase 15 — busca e filtro na fila de propostas
+- ✅ Fase 16 — notificação simulada por e-mail

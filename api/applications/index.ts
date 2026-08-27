@@ -10,6 +10,7 @@ import {
 import { encryptField, hashForLookup } from '../_lib/crypto'
 import { generateClientPortalToken, requireDealerSession } from '../_lib/auth'
 import { transition } from '../_lib/stateMachine'
+import { notify } from '../_lib/notifications'
 import { getUrl, readJsonBody, sendJson, type Handler } from '../_lib/http'
 
 const CLIENT_LINK_TTL_DAYS = 7
@@ -190,6 +191,7 @@ async function handleCreate(
     actorType: 'dealer_user',
     actorId: dealerUserId,
   })
+  await notify(db, application!.id, 'link_sent')
 
   sendJson(res, 201, {
     ...application,

@@ -4,6 +4,7 @@ import { getDb } from '../../_lib/db'
 import { applications, loanOffers, type NewLoanOffer } from '../../_lib/schema'
 import { requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
+import { notify } from '../../_lib/notifications'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 /** Taxa fixa de portfólio — não vem de nenhuma tabela de produto real. */
@@ -79,6 +80,7 @@ async function handleCreate(
     actorType: 'dealer_user',
     actorId: dealerUserId,
   })
+  await notify(db, applicationId, 'offer_created')
 
   sendJson(res, 201, offer)
 }

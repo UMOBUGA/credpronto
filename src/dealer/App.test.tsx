@@ -42,6 +42,7 @@ function buildApplicationDetail(status: string) {
     latestDecision: null,
     offers: [],
     consents: [],
+    notifications: [],
   }
 }
 
@@ -113,6 +114,7 @@ describe('App (dealer)', () => {
           latestDecision: null,
           offers: [],
           consents: [],
+          notifications: [],
         }),
       ),
       http.get('/api/applications/:id/audit-log', () => HttpResponse.json([])),
@@ -165,5 +167,57 @@ describe('App (dealer)', () => {
 
     expect(await screen.findByText('credpronto')).toBeInTheDocument()
     expect(screen.queryByText('Editar proposta')).not.toBeInTheDocument()
+  })
+
+  it('mostra as notificações disparadas para a proposta (Fase 16)', async () => {
+    server.use(
+      http.get('/api/auth/session', () =>
+        HttpResponse.json({
+          user: { id: '1', name: 'Dealer Teste', email: 'd@example.test', role: 'admin' },
+        }),
+      ),
+      http.get('/api/applications/:id', () =>
+        HttpResponse.json({
+          ...buildApplicationDetail('offer_created'),
+          notifications: [
+            {
+              id: 'n1',
+              template: 'offer_created',
+              status: 'sent',
+              sentAt: '2026-08-27T12:00:00.000Z',
+            },
+            {
+              id: 'n2',
+              template: 'link_sent',
+              status: 'failed',
+              sentAt: '2026-08-20T12:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+      http.get('/api/applications/:id/audit-log', () => HttpResponse.json([])),
+    )
+    renderWithQuery(<App />, { route: `/propostas/${APPLICATION_ID}` })
+
+    expect(
+      await screen.findByText('Oferta de financiamento gerada — 27/08/2026'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Link do portal enviado ao cliente/)).toBeInTheDocument()
+    expect(screen.getByText(/\(falhou\)/)).toBeInTheDocument()
+  })
+
+  it('mostra mensagem de vazio quando nenhuma notificação foi disparada ainda (Fase 16)', async () => {
+    server.use(
+      http.get('/api/auth/session', () =>
+        HttpResponse.json({
+          user: { id: '1', name: 'Dealer Teste', email: 'd@example.test', role: 'admin' },
+        }),
+      ),
+      http.get('/api/applications/:id', () => HttpResponse.json(buildApplicationDetail('draft'))),
+      http.get('/api/applications/:id/audit-log', () => HttpResponse.json([])),
+    )
+    renderWithQuery(<App />, { route: `/propostas/${APPLICATION_ID}` })
+
+    expect(await screen.findByText('Nenhuma notificação disparada ainda.')).toBeInTheDocument()
   })
 })

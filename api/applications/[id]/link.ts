@@ -4,6 +4,7 @@ import { applications } from '../../_lib/schema'
 import { generateClientPortalToken, requireDealerSession } from '../../_lib/auth'
 import { transition } from '../../_lib/stateMachine'
 import { logAction } from '../../_lib/audit'
+import { notify } from '../../_lib/notifications'
 import { pathSegment, sendJson, type Handler } from '../../_lib/http'
 
 const LINK_TTL_DAYS = 7
@@ -48,6 +49,7 @@ const handler: Handler = async (req, res) => {
       },
     )
   }
+  await notify(db, applicationId, 'link_sent')
 
   sendJson(res, 200, { portalPath: `/portal/${token}` })
 }

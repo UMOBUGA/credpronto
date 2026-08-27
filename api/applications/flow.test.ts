@@ -1,3 +1,5 @@
+import { eq } from 'drizzle-orm'
+
 const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }))
 
 vi.mock('@anthropic-ai/sdk', () => ({
@@ -16,6 +18,7 @@ import clientSubmitHandler from '../client/[token]/submit'
 import clientDocumentsHandler from '../client/[token]/documents'
 import clientOpenfinanceHandler from '../client/[token]/openfinance'
 import { getDb } from '../_lib/db'
+import { notificationLog } from '../_lib/schema'
 import { seedDealerUser } from '../_lib/testFixtures'
 import { createSessionToken, SESSION_COOKIE_NAME } from '../_lib/auth'
 import { mockReq, mockRes } from '../_lib/testHttp'
@@ -273,6 +276,17 @@ describe('esteira — caminho feliz (tudo simulado, extração de IA mockada)', 
     }
     expect(clientViewAfter.decision?.outcome).toBe('approved')
     expect(clientViewAfter.decision?.riskNarrativeApplicant).toContain('aprovada')
+
+    // Fase 16: os três gatilhos do caminho feliz disparam notificação —
+    // criação do link, decisão pronta (outcome != manual_review) e oferta.
+    const notifications = await db
+      .select()
+      .from(notificationLog)
+      .where(eq(notificationLog.applicationId, applicationId))
+    expect(notifications.map((n) => n.template).sort()).toEqual(
+      ['decision_ready', 'link_sent', 'offer_created'].sort(),
+    )
+    expect(notifications.every((n) => n.status === 'sent')).toBe(true)
   })
 
   it('quando o cliente nega o Open Finance, a esteira segue sem penalizar a decisão', async () => {

@@ -11,6 +11,7 @@ import {
   documentExtractions,
   documents,
   loanOffers,
+  notificationLog,
   openfinanceConsents,
   openfinanceData,
   vehicleChecks,
@@ -182,6 +183,19 @@ async function handleGet(
     .where(eq(consentRecords.applicationId, applicationId))
     .orderBy(desc(consentRecords.grantedAt))
 
+  // Fase 16: prova de que a notificação foi disparada, nunca o conteúdo —
+  // ver comentário em `schema.ts::notificationLog`.
+  const notifications = await db
+    .select({
+      id: notificationLog.id,
+      template: notificationLog.template,
+      status: notificationLog.status,
+      sentAt: notificationLog.sentAt,
+    })
+    .from(notificationLog)
+    .where(eq(notificationLog.applicationId, applicationId))
+    .orderBy(desc(notificationLog.sentAt))
+
   const [latestOpenfinanceConsent] = await db
     .select({
       id: openfinanceConsents.id,
@@ -241,6 +255,7 @@ async function handleGet(
       latestDecision: latestDecision ?? null,
       offers,
       consents,
+      notifications,
     },
     'no-store',
   )

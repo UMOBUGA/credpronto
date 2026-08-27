@@ -349,6 +349,24 @@ filtro de status é um `<select>` direto. Um segundo `useEffect` observa `[statu
 reseta `page` pra 1 — sem isso, aplicar um filtro enquanto o dealer está na página 3 quase sempre
 mostraria "vazio" mesmo havendo resultado na página 1.
 
+**Fase 16 — notificação simulada por e-mail**: mesma filosofia do bureau/Open Finance —
+`api/_lib/notifications.ts::MockNotificationClient` (padrão) só loga no console e grava uma linha
+em `notification_log`, sem nenhum provedor real configurado; `RealNotificationClient` (atrás de
+`NOTIFICATIONS_ENABLED=true`) lança em todo método, mesmo padrão de `RealOpenFinanceClient` — a
+diferença é que aqui a barreira não é regulatória, é só estar fora do escopo de um projeto de
+portfólio (exigiria chave de API e domínio verificado próprios do usuário). `notification_log` é
+deliberadamente **sem nenhum campo de PII** (nem e-mail mascarado) — só prova que uma notificação
+foi disparada para uma proposta, quem quiser o e-mail do titular já vê na tela de detalhe (não é
+mascarado hoje, diferente de CPF/renda). A função `notify()` é não-bloqueante por design, mesmo
+princípio de `generateAndSaveNarrative` (Fase 4): engole qualquer erro do client e tenta gravar
+`status: 'failed'` em vez de propagar — nunca deve impedir a transição de estado real que a
+motivou. Quatro gatilhos automáticos: criação de proposta e reenvio de link (`link_sent`),
+decisão calculada pelo motor **só quando não é `manual_review`** (`decision_ready` — não há nada
+de novo pro cliente saber até um humano resolver) e resolução manual em `resolve.ts`
+(`decision_ready` sempre, já que essa rota só produz `approved`/`denied`), e criação de oferta
+(`offer_created`). `api/applications/[id].ts` inclui a lista em `notifications`, mesmo padrão de
+`consents` (Fase 12); nova seção "Notificações" no detalhe.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.
