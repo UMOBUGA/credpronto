@@ -44,7 +44,8 @@ export interface ApplicationSummary {
   updatedAt: string
 }
 
-export type DocumentType = 'rg' | 'cpf' | 'cnh' | 'comprovante_renda' | 'comprovante_residencia'
+export type DocumentType =
+  'rg' | 'cpf' | 'cnh' | 'passaporte' | 'comprovante_renda' | 'comprovante_residencia'
 
 export interface DocumentExtractionSummary {
   id: string
@@ -61,6 +62,8 @@ export interface DocumentSummary {
   mimeType?: string
   createdAt?: string
   extraction?: DocumentExtractionSummary | null
+  /** Dado digitado pelo cliente junto com a foto no envio (Fase 8) — ver `documentTypes.ts`. */
+  manualFields?: Record<string, string> | null
 }
 
 export interface BureauCheckSummary {

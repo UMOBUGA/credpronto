@@ -313,7 +313,8 @@ input {
   margin-bottom: 8px;
 }
 
-.document-extraction {
+.document-extraction,
+.document-manual-fields {
   margin-top: 8px;
 }
 
@@ -346,4 +347,14 @@ input {
   border-radius: var(--radius);
   padding: 24px;
   margin-top: 16px;
+}
+
+.document-preview {
+  display: block;
+  max-width: 240px;
+  max-height: 240px;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin: 8px 0;
 }

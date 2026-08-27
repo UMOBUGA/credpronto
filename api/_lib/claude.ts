@@ -37,7 +37,7 @@ const EXTRACTION_TOOL_NAME = 'extract_document_fields'
 const EXTRACTION_TOOL: Anthropic.Tool = {
   name: EXTRACTION_TOOL_NAME,
   description:
-    'Registra os campos extraídos de um documento brasileiro (RG, CPF, CNH, comprovante de renda ou de residência) a partir da imagem fornecida.',
+    'Registra os campos extraídos de um documento de identidade ou comprovante (RG, CPF, CNH, passaporte, comprovante de renda ou de residência) a partir da imagem fornecida.',
   input_schema: {
     type: 'object',
     properties: {
@@ -69,6 +69,10 @@ const EXPECTED_FIELDS: Record<DocumentType, string> = {
   rg: 'nome, cpf, dataNascimento',
   cpf: 'nome, cpf',
   cnh: 'nome, cpf, dataNascimento',
+  // Passaporte não tem CPF impresso — não pedir esse campo evita marcar
+  // `issues` por um campo que nunca vai estar na imagem (ver `EXTRACTION_SYSTEM_PROMPT`,
+  // que já instrui a IA a nunca inventar dado ausente).
+  passaporte: 'nome, numeroPassaporte, nacionalidade, dataNascimento',
   comprovante_renda: 'nome, rendaMensalDeclarada',
   comprovante_residencia: 'nome, endereco',
 }

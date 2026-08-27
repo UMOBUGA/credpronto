@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { getDb } from '../../_lib/db'
 import { documents } from '../../_lib/schema'
 import { putDocument } from '../../_lib/storage'
+import { encryptField } from '../../_lib/crypto'
 import { requireApplicationByToken } from '../../_lib/auth'
 import { logAction } from '../../_lib/audit'
 import { runExtraction } from '../../_lib/documentExtraction'
@@ -23,10 +24,14 @@ const SUPPORTED_MIME_TYPES = new Set([
 ])
 
 const bodySchema = z.object({
-  type: z.enum(['rg', 'cpf', 'cnh', 'comprovante_renda', 'comprovante_residencia']),
+  type: z.enum(['rg', 'cpf', 'cnh', 'passaporte', 'comprovante_renda', 'comprovante_residencia']),
   filename: z.string().min(1),
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']),
   contentBase64: z.string().min(1),
+  // Digitado pelo cliente junto com a foto (Fase 8) — ver `src/shared/documentTypes.ts`
+  // pra saber quais campos cada tipo de documento pede. Independente da
+  // extração por IA: redundância deliberada pro dealer comparar.
+  manualFields: z.record(z.string(), z.string()).optional(),
 })
 
 /**
@@ -82,6 +87,9 @@ const handler: Handler = async (req, res) => {
       mimeType: parsed.data.mimeType,
       uploadedBy: 'applicant',
       status: 'uploaded',
+      manualFieldsEncrypted: parsed.data.manualFields
+        ? encryptField(JSON.stringify(parsed.data.manualFields))
+        : null,
     })
     .returning()
 

@@ -122,7 +122,18 @@ async function handleGet(
       }
     }
 
-    docs.push({ ...doc, extraction })
+    const manualFields = doc.manualFieldsEncrypted
+      ? (JSON.parse(
+          await decryptField(doc.manualFieldsEncrypted, {
+            ...baseCtx,
+            entityType: 'document',
+            entityId: doc.id,
+            field: 'manualFields',
+          }),
+        ) as Record<string, string>)
+      : null
+
+    docs.push({ ...doc, extraction, manualFields })
   }
 
   const [latestBureauCheck] = await db

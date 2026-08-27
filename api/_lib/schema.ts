@@ -117,6 +117,12 @@ export const documentTypeEnum = pgEnum('document_type', [
   'rg',
   'cpf',
   'cnh',
+  // Documento de identidade pra comprador estrangeiro (Fase 8) — CPF
+  // continua obrigatório pra todo comprador (é o identificador do contrato
+  // de crédito no Brasil, `applicants.cpfHash` não muda), então isto entra
+  // como mais um tipo de documento de identidade enviável, não como
+  // substituto do CPF.
+  'passaporte',
   'comprovante_renda',
   'comprovante_residencia',
 ])
@@ -141,6 +147,14 @@ export const documents = pgTable('documents', {
   mimeType: text('mime_type').notNull(),
   uploadedBy: uploadedByEnum('uploaded_by').notNull(),
   status: documentStatusEnum('status').notNull().default('uploaded'),
+  // Dado digitado pelo cliente junto com o envio da foto (Fase 8) — ex.:
+  // número do documento, país emissor de um passaporte. Cifrado como todo
+  // campo `_encrypted` (pode conter PII), nullable porque nem todo tipo de
+  // documento pede campo extra (ver `src/shared/documentTypes.ts`).
+  // Independente da extração por IA em `document_extractions` — é
+  // redundância deliberada: se a extração falhar ou pedir revisão, o dealer
+  // já tem algo digitado pelo próprio cliente pra comparar.
+  manualFieldsEncrypted: text('manual_fields_encrypted'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

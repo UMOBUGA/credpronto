@@ -1,15 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
+import { DOCUMENT_TYPE_LABELS } from '@/shared/documentTypes'
 import type { DocumentSummary } from '@/shared/types'
-
-const DOCUMENT_TYPE_LABELS: Record<DocumentSummary['type'], string> = {
-  rg: 'RG',
-  cpf: 'CPF',
-  cnh: 'CNH',
-  comprovante_renda: 'Comprovante de renda',
-  comprovante_residencia: 'Comprovante de residência',
-}
 
 const EXTRACTION_STATUS_LABELS: Record<
   NonNullable<DocumentSummary['extraction']>['status'],
@@ -76,6 +69,20 @@ export function DocumentReviewCard({ applicationId, document, onChanged }: Props
         <a href={`/api/documents/${document.id}/file`} target="_blank" rel="noreferrer">
           {isImage ? 'Ver imagem do documento' : 'Abrir arquivo'}
         </a>
+      )}
+
+      {document.manualFields && Object.keys(document.manualFields).length > 0 && (
+        <div className="document-manual-fields">
+          <p className="hint-text">Dados informados pelo cliente no envio:</p>
+          <dl>
+            {Object.entries(document.manualFields).map(([key, value]) => (
+              <div key={key} className="document-field-row">
+                <dt>{key}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       )}
 
       {extraction && (
