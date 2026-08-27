@@ -12,7 +12,17 @@ export function portalDevPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathname = (req.url ?? '').split('?')[0] ?? ''
-        if (pathname.startsWith('/api/') || pathname.startsWith('/assets/')) {
+        // Módulos internos do próprio Vite (`/@react-refresh`, `/@vite/client`,
+        // `/@vite/env`, `/@id/...`, `/@fs/...`) sempre começam com `/@` e não
+        // têm ponto no nome — sem esta checagem eles caíam no fallback de SPA
+        // abaixo e voltavam como `dealer.html`, quebrando o React Refresh e
+        // deixando a tela em branco (o import de `/@react-refresh` falhava
+        // silenciosamente por receber HTML em vez de JS).
+        if (
+          pathname.startsWith('/api/') ||
+          pathname.startsWith('/assets/') ||
+          pathname.startsWith('/@')
+        ) {
           next()
           return
         }
