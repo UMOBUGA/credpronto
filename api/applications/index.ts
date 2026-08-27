@@ -51,11 +51,6 @@ const createSchema = z.object({
   requestedTermMonths: z.number().int().positive(),
 })
 
-/**
- * Paginada por offset (`?page=`, padrão simples o bastante pro volume de um
- * projeto de portfólio — sem cursor, sem índice extra). Antes disso a lista
- * cortava fixo em 100 registros sem nenhum jeito de ver o resto.
- */
 const STATUS_VALUES = new Set<string>(applicationStatusEnum.enumValues)
 
 /**
