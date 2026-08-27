@@ -22,7 +22,7 @@ oferta de financiamento.
 
 ```bash
 npm install
-npm run db:seed    # cria dealer@credpronto.dev / credpronto123 + 4 propostas de exemplo
+npm run db:seed    # cria dealer@credpronto.dev / credpronto123 + 7 propostas de exemplo
 npm run dev
 ```
 
@@ -39,29 +39,48 @@ npm run db:seed
 ### Roteiro de demonstração
 
 Depois do `npm run db:seed`, logue com `dealer@credpronto.dev` / `credpronto123` e a fila já vem
-com 4 propostas em estados diferentes:
+com 7 propostas em estados diferentes. O seed (`scripts/seed.ts`) não inventa números — ele chama
+os mesmos mocks determinísticos e o mesmo motor de decisão (`decide()`) que a esteira real usa,
+então cada resultado é uma consequência real da regra, não um valor fixo desconectado:
 
-1. **Proposta em `manual_review`** — abra o detalhe: bureau/veículo/antifraude já rodaram, um
-   sinal de antifraude forçou revisão humana. Clique em "Aprovar manualmente" ou "Negar
-   manualmente" pra ver `resolve.ts` gerar uma nova linha em `credit_decisions` e (com
-   `ANTHROPIC_API_KEY` configurada) um parecer de IA de verdade.
-2. **Proposta em `offer_created`** — CPF e renda aparecem mascarados por padrão; clique em
-   "Revelar" (usuário seed é `admin`) e note a nova linha `pii.revealed` na "Trilha de auditoria"
-   no fim da página, distinta das linhas `pii.decrypted` rotineiras.
-3. **Proposta em `denied`** — bureau simulado com restrição ativa; a "Trilha de auditoria" mostra
-   a sequência completa de decrypts que a tela de detalhe disparou.
-4. **Proposta em `link_sent`** — copie o link do portal do cliente (`/portal/:token` na própria
-   URL) e complete o fluxo do zero: dados pessoais (com os 3 checkboxes de consentimento
-   granular), upload de documento — inclui a opção "Passaporte (estrangeiros)" com campo de
-   número/país digitados junto com a foto (extração por IA se `ANTHROPIC_API_KEY` estiver
-   configurada, senão cai graciosamente em `failed` com retry manual) —, Open Finance simulado,
-   checagens, decisão, oferta. Um indicador de progresso no topo do portal mostra em qual desses
+1. **Fiat Mobi — `link_sent`** — o ponto de partida: nada preenchido ainda. Copie o link do
+   portal (`/portal/:token` na própria URL) e complete o fluxo do zero: dados pessoais (com os 3
+   checkboxes de consentimento granular), upload de documento — inclui a opção "Passaporte
+   (estrangeiros)" com número/país digitados junto com a foto —, Open Finance simulado,
+   checagens, decisão, oferta. O indicador de progresso no topo do portal mostra em qual desses
    passos o cliente está.
-5. **"Nova proposta"** — antes de criar, digite marca/modelo/ano e clique em "Consultar valor
-   FIPE" pra ver o valor de mercado real (BrasilAPI) já na hora de montar a proposta.
-6. **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
-   mostra o que seria anonimizado sem escrever nada; sem `dryRun`, anonimiza de verdade quem já
-   passou da janela de retenção (nenhuma das 4 propostas de exemplo qualifica — são recém-criadas).
+2. **VW Polo — `documents_review_required`** — um RG com confiança baixa (58%) parado esperando
+   revisão: os campos extraídos pela IA aparecem editáveis ao lado do número de documento que o
+   próprio cliente digitou no envio, pra comparar. Clique em "Aprovar" ou "Rejeitar".
+3. **Toyota Yaris — `awaiting_openfinance_consent`** — documento já aceito automaticamente,
+   proposta parada esperando o cliente decidir sobre o Open Finance (ainda não existe
+   consentimento nenhum registrado nesse ponto — só é criado quando o cliente responde).
+4. **Jeep Compass — `manual_review`** — comprador estrangeiro com passaporte (número/país
+   emissor digitados manualmente); o CPF que a IA "extraiu" diverge do declarado, o que o
+   anti-fraude de verdade (`checkAntifraud`) pega como `cpf_mismatch` — e é esse sinal, não um
+   outcome escolhido a dedo, que faz `decide()` forçar revisão manual.
+5. **Toyota Corolla — `offer_created`** — o caminho feliz completo: valor FIPE **real** (consulta
+   de verdade à BrasilAPI no momento do seed), Open Finance autorizado, decisão aprovada
+   calculada pela regra real, oferta gerada com a mesma fórmula do endpoint de produção.
+6. **Hyundai HB20 — `denied`** — placa com restrição de roubo/furto/gravame (simulada) — a regra
+   que nega antes de qualquer outra coisa em `decide()`, mesmo com bureau limpo. Cliente autorizou
+   só o tratamento de dados (não marcou bureau/parecer de IA) — mostra que a esteira segue
+   funcionando com consentimento parcial.
+7. **Honda HR-V — `offer_accepted`** — o ciclo inteiro concluído, incluindo a oferta aceita; é o
+   caso mais "antigo" pra testar a janela longa de retenção (veja o item de crons abaixo).
+
+Em qualquer uma delas: CPF e renda aparecem mascarados por padrão; clique em "Revelar" (usuário
+seed é `admin`) e note a linha `pii.revealed` na "Trilha de auditoria", distinta das linhas
+`pii.decrypted` rotineiras que a própria tela de detalhe já gera ao decriptar nome/telefone/e-mail.
+
+Fora da fila:
+
+- **"Nova proposta"** — antes de criar, digite marca/modelo/ano e clique em "Consultar valor
+  FIPE" pra ver o valor de mercado real (BrasilAPI) já na hora de montar a proposta.
+- **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
+  mostra o que seria anonimizado sem escrever nada; sem `dryRun`, anonimiza de verdade quem já
+  passou da janela de retenção (nenhuma das 7 propostas de exemplo qualifica de cara — são
+  recém-criadas, mas dá pra editar `updatedAt` direto no banco pra testar).
 
 ## Comandos
 

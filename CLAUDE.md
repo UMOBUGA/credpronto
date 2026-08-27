@@ -186,12 +186,23 @@ token _é_ a autenticação ali (sem senha), então limitar a taxa de adivinhaç
 no login. `Cache-Control: no-store` foi adicionado às respostas que carregam PII ou token
 (`applications/[id].ts`, `client/[token].ts`, `reveal.ts`, `audit-log.ts`).
 
-**Dado de demonstração**: `scripts/seed.ts` agora também cria 4 propostas sintéticas cobrindo os
-principais estados da esteira (`link_sent`, `manual_review`, `offer_created` com oferta,
-`denied`) — só roda se o banco ainda não tiver nenhuma proposta, pra não duplicar em reruns. São
-inseridas direto nas tabelas (sem passar por `transition()`/`logAction()`): é histórico fabricado
-para a demo funcionar de cara, não uma sequência real de eventos — não faria sentido aparecer na
-trilha de auditoria como se fosse.
+**Dado de demonstração**: `scripts/seed.ts` cria 7 propostas sintéticas cobrindo os principais
+estados da esteira (`link_sent`, `documents_review_required`, `awaiting_openfinance_consent`,
+`manual_review`, `offer_created`, `denied`, `offer_accepted`) — só roda se o banco ainda não
+tiver nenhuma proposta, pra não duplicar em reruns. Reescrito na Fase "seed redondo" (pós Fase 13)
+pra reaproveitar os mesmos mocks determinísticos e o mesmo `decide()` que a esteira real usa
+(`checkBureauMock`/`checkVehicleRestrictionMock`/`checkAntifraud`/`lookupFipeValue`/
+`getOpenFinanceClient`), em vez de linhas de `credit_decisions` com outcome escolhido a dedo — o
+`manual_review` de demonstração, por exemplo, é `manual_review` porque um CPF "extraído"
+divergente do declarado realmente produz `cpf_mismatch` em `checkAntifraud`, e é esse sinal que
+faz `decide()` decidir revisão manual, igual aconteceria num caso real. Uma das propostas
+(`offer_created`) chama `lookupFipeValue()` de verdade contra a BrasilAPI no momento do seed —
+único ponto do seed que depende de rede, com o mesmo fallback gracioso (`null`) de sempre se
+estiver offline. `withScenario()` (helper local do script) troca temporariamente as env vars
+`MOCK_*_SCENARIO` pra forçar cada cenário sem depender de achar por tentativa um CPF/placa cujo
+hash caia no resultado certo. Inserido direto nas tabelas (sem passar por
+`transition()`/`logAction()`): é histórico fabricado para a demo funcionar de cara, não uma
+sequência real de eventos — não faria sentido aparecer na trilha de auditoria como se fosse.
 
 ## Rodada 2 — navegação, documentos, avaliação veicular, redesign (Fases 7-10)
 

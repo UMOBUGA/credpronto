@@ -7,7 +7,7 @@ import { transition } from '../../_lib/stateMachine'
 import { pathSegment, readJsonBody, sendJson, type Handler } from '../../_lib/http'
 
 /** Taxa fixa de portfólio — não vem de nenhuma tabela de produto real. */
-const FIXED_MONTHLY_RATE = 0.0199
+export const FIXED_MONTHLY_RATE = 0.0199
 
 const createSchema = z.object({
   amount: z.number().positive().optional(),
@@ -23,7 +23,8 @@ const NEXT_APPLICATION_STATUS = {
   declined: 'offer_declined',
 } as const
 
-function calculateMonthlyPayment(
+/** Exportada pra `scripts/seed.ts` reaproveitar em vez de duplicar a fórmula. */
+export function calculateMonthlyPayment(
   principal: number,
   monthlyRate: number,
   termMonths: number,
