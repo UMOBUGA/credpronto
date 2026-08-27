@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
 import { formatCurrency } from '@/shared/lib/format'
+import { isValidCpf } from '@/shared/cpfValidation'
 
 interface CreateResponse {
   id: string
@@ -52,6 +53,7 @@ export default function NewApplicationPage() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [fipeResult, setFipeResult] = useState<FipeLookupResult | null>(null)
+  const [cpfError, setCpfError] = useState<string | null>(null)
 
   const fipeLookup = useMutation({
     mutationFn: () => {
@@ -120,6 +122,11 @@ export default function NewApplicationPage() {
         className="form-grid"
         onSubmit={(event) => {
           event.preventDefault()
+          if (!isValidCpf(form.cpf)) {
+            setCpfError('CPF inválido — confira os 11 dígitos e o dígito verificador.')
+            return
+          }
+          setCpfError(null)
           mutation.mutate()
         }}
       >
@@ -135,7 +142,15 @@ export default function NewApplicationPage() {
           </label>
           <label>
             CPF
-            <input value={form.cpf} onChange={(e) => set('cpf', e.target.value)} required />
+            <input
+              value={form.cpf}
+              onChange={(e) => {
+                set('cpf', e.target.value)
+                setCpfError(null)
+              }}
+              required
+            />
+            {cpfError && <span className="form-error">{cpfError}</span>}
           </label>
           <label>
             Telefone
@@ -259,7 +274,12 @@ export default function NewApplicationPage() {
             />
           </label>
         </fieldset>
-        {mutation.isError && <p className="form-error">Não foi possível criar a proposta.</p>}
+        {mutation.isError && (
+          <p className="form-error">
+            Não foi possível criar a proposta — confira se todos os campos estão preenchidos
+            corretamente.
+          </p>
+        )}
         <button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Criando…' : 'Criar e gerar link'}
         </button>

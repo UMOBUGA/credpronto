@@ -167,6 +167,9 @@ export default function ApplicationDetailPage() {
             auditada).
           </p>
         )}
+        {(revealCpf.isError || revealIncome.isError) && (
+          <p className="form-error">Não foi possível revelar o dado. Tente novamente.</p>
+        )}
       </section>
 
       <section className="detail-section">
@@ -184,6 +187,9 @@ export default function ApplicationDetailPage() {
         </button>
         {resendLink.isSuccess && (
           <p className="hint-text">Link renovado — o anterior parou de funcionar.</p>
+        )}
+        {resendLink.isError && (
+          <p className="form-error">Não foi possível gerar um novo link. Tente novamente.</p>
         )}
       </section>
 
@@ -304,6 +310,12 @@ export default function ApplicationDetailPage() {
               <button onClick={() => retryNarrative.mutate()} disabled={retryNarrative.isPending}>
                 {retryNarrative.isPending ? 'Gerando…' : 'Gerar parecer'}
               </button>
+              {retryNarrative.isError && (
+                <p className="form-error">
+                  A IA não respondeu — confira se a chave da Anthropic está configurada e tente de
+                  novo.
+                </p>
+              )}
             </>
           )}
         </section>
@@ -322,6 +334,9 @@ export default function ApplicationDetailPage() {
               : 'Rodar verificações (bureau, veículo, antifraude)'}
           </button>
         )}
+        {runBureauCheck.isError && (
+          <p className="form-error">Não foi possível rodar as verificações. Tente novamente.</p>
+        )}
         {data.status === 'awaiting_openfinance_consent' && (
           <p className="hint-text">Aguardando o cliente autorizar (ou não) o Open Finance.</p>
         )}
@@ -329,6 +344,9 @@ export default function ApplicationDetailPage() {
           <button onClick={() => runDecision.mutate()} disabled={runDecision.isPending}>
             {runDecision.isPending ? 'Calculando…' : 'Calcular decisão'}
           </button>
+        )}
+        {runDecision.isError && (
+          <p className="form-error">Não foi possível calcular a decisão. Tente novamente.</p>
         )}
         {data.status === 'manual_review' && (
           <>
@@ -338,10 +356,16 @@ export default function ApplicationDetailPage() {
             <button onClick={() => resolveManualReview.mutate('denied')}>Negar manualmente</button>
           </>
         )}
+        {resolveManualReview.isError && (
+          <p className="form-error">Não foi possível registrar a decisão. Tente novamente.</p>
+        )}
         {data.status === 'approved' && (
           <button onClick={() => createOffer.mutate()} disabled={createOffer.isPending}>
             {createOffer.isPending ? 'Gerando…' : 'Gerar oferta'}
           </button>
+        )}
+        {createOffer.isError && (
+          <p className="form-error">Não foi possível gerar a oferta. Tente novamente.</p>
         )}
       </section>
 

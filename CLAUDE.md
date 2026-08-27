@@ -273,6 +273,36 @@ nada na UI do dealer mostrava isso — só existia implicitamente no banco/audit
 manual); nova seção "Consentimentos" no detalhe lista os 4 tipos, mostrando "Não concedido"
 quando o titular não marcou aquele item.
 
+## Fase 13 — feedback de erro nas ações do dealer + validação real de CPF
+
+Depois de usar o painel, o usuário reportou 3 problemas: os botões "Tentar extrair de novo" e
+"Gerar parecer" pareciam não fazer nada ao clicar; criar uma proposta com um CPF de 10 dígitos
+falhava com uma mensagem genérica sem dizer por quê; e pediu pra limpar o dado de teste
+acumulado. Investigação mostrou que os dois primeiros não eram bugs de lógica — eram ausência de
+feedback visual quando uma ação falha:
+
+- `POST /api/documents/[id]/extract` (retry de extração) **sempre responde 200**, mesmo quando a
+  extração falha de novo (`runExtraction` engole o erro por design). O botão só invalidava a
+  query — como o `status` continuava `failed`, a tela voltava exatamente como estava, sem
+  indicação de que algo foi tentado. `DocumentReviewCard.tsx` agora checa o resultado da mutação
+  (`retry.data?.documentStatus === 'failed'`) e mostra uma mensagem específica.
+- `POST /api/applications/[id]/narrative` (retry de parecer) responde 502 quando a IA falha, mas
+  `ApplicationDetailPage.tsx` não tratava `isError` — o erro lançado por `apiFetch` desaparecia
+  em silêncio.
+- CPF com menos de 11 dígitos só era pego pelo `min(11)` do zod no backend, depois de uma
+  requisição — `NewApplicationPage.tsx` mostrava sempre a mesma mensagem genérica. `isValidCpf`
+  (checksum módulo 11, já existente em `api/_lib/cpfValidation.ts` pra validar o que a IA extrai
+  de documento) foi duplicada em `src/shared/cpfValidation.ts` — não dá pra importar de `api/_lib`
+  no frontend, bundles separados — e passa a barrar o envio no formulário antes de gastar uma
+  requisição.
+
+O mesmo padrão (mutação sem `isError` tratado) se repetia em quase toda ação do painel do dealer
+— `revealCpf`, `revealIncome`, `runBureauCheck`, `runDecision`, `resolveManualReview`,
+`createOffer`, `resendLink` (`ApplicationDetailPage.tsx`) e `review`
+(`DocumentReviewCard.tsx`) — só o portal do cliente já tinha isso desde o início. Todas ganharam
+uma mensagem específica, mesmo padrão simples (`{mutation.isError && <p className="form-error">...</p>}`)
+que o portal do cliente já usava — sem componente novo, sem abstração.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

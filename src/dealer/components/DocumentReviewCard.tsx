@@ -30,7 +30,10 @@ export function DocumentReviewCard({ applicationId, document, onChanged }: Props
   }
 
   const retry = useMutation({
-    mutationFn: () => apiFetch(`/api/documents/${document.id}/extract`, { method: 'POST' }),
+    mutationFn: () =>
+      apiFetch<{ documentStatus: string }>(`/api/documents/${document.id}/extract`, {
+        method: 'POST',
+      }),
     onSuccess: invalidate,
   })
 
@@ -60,9 +63,17 @@ export function DocumentReviewCard({ applicationId, document, onChanged }: Props
       </div>
 
       {document.status === 'failed' && (
-        <button onClick={() => retry.mutate()} disabled={retry.isPending}>
-          {retry.isPending ? 'Tentando…' : 'Tentar extrair de novo'}
-        </button>
+        <>
+          <button onClick={() => retry.mutate()} disabled={retry.isPending}>
+            {retry.isPending ? 'Tentando…' : 'Tentar extrair de novo'}
+          </button>
+          {(retry.isError || retry.data?.documentStatus === 'failed') && (
+            <p className="form-error">
+              A extração falhou de novo — confira se a chave da Anthropic está configurada no
+              servidor.
+            </p>
+          )}
+        </>
       )}
 
       {document.status === 'extracted' && (
@@ -131,6 +142,9 @@ export function DocumentReviewCard({ applicationId, document, onChanged }: Props
                   Rejeitar
                 </button>
               </div>
+              {review.isError && (
+                <p className="form-error">Não foi possível salvar. Tente novamente.</p>
+              )}
             </>
           ) : (
             <dl>

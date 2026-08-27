@@ -29,6 +29,13 @@ npm run dev
 Sem nenhuma variável de ambiente definida, o backend roda contra um Postgres embutido (PGlite)
 local — zero configuração. Acesse `http://localhost:5173/` para o painel da loja.
 
+Pra zerar o banco local (descartável, nunca é usado em produção) e recomeçar só com o seed:
+
+```bash
+rm -rf .pglite-data .data
+npm run db:seed
+```
+
 ### Roteiro de demonstração
 
 Depois do `npm run db:seed`, logue com `dealer@credpronto.dev` / `credpronto123` e a fila já vem
@@ -92,3 +99,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 10 — repaginação visual completa (tipografia, paleta, componentes)
 - ✅ Fase 11 — revalidação geral ponta a ponta (ver CLAUDE.md para os achados registrados)
 - ✅ Fase 12 — reenvio de link do cliente, paginação da fila, visibilidade de consentimento
+- ✅ Fase 13 — feedback de erro nas ações do dealer, validação real de CPF na criação
