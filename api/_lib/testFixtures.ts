@@ -50,18 +50,24 @@ export async function seedApplicant(db: Db): Promise<Applicant> {
 
 export async function seedApplication(
   db: Db,
-  params: { applicantId: string; dealerUserId: string },
+  params: {
+    applicantId: string
+    dealerUserId: string
+    vehicleMake?: string
+    vehicleModel?: string
+    vehiclePlate?: string
+  },
 ): Promise<Application> {
   const [application] = await db
     .insert(applications)
     .values({
       applicantId: params.applicantId,
       dealerUserId: params.dealerUserId,
-      vehicleMake: 'Fiat',
-      vehicleModel: 'Argo',
+      vehicleMake: params.vehicleMake ?? 'Fiat',
+      vehicleModel: params.vehicleModel ?? 'Argo',
       vehicleYear: 2022,
       vehiclePrice: 80000,
-      vehiclePlate: 'ABC1D23',
+      vehiclePlate: params.vehiclePlate ?? 'ABC1D23',
       downPayment: 10000,
       requestedAmount: 70000,
       requestedTermMonths: 48,

@@ -236,6 +236,21 @@ select:focus-visible {
   font-size: 0.8rem;
 }
 
+.list-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.list-filters input[type='search'] {
+  flex: 1 1 240px;
+}
+
+.list-filters select {
+  flex: 0 1 220px;
+}
+
 .empty-state {
   background: var(--color-surface);
   border: 1px dashed var(--color-border);

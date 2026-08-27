@@ -333,6 +333,22 @@ do que a UI decidir renderizar. `src/dealer/components/EditApplicationForm.tsx` 
 e inicializa seu próprio estado via inicializador preguiçoso do `useState` — dispensa `useEffect`
 de sincronização porque a página inteira remonta ao trocar de proposta (rota por `id`).
 
+**Fase 15 — busca e filtro na fila**: `handleList` (`api/applications/index.ts`) ganhou `?status=`
+(um valor exato do enum, silenciosamente ignorado se inválido — nunca um 400 por um filtro
+digitado errado) e `?q=` (`ilike` em `vehicleMake`/`vehicleModel`/`vehiclePlate`, as únicas
+colunas de veículo não criptografadas; busca por nome/CPF do titular ficou fora de escopo — são
+cifradas, exigiria decriptar linha a linha). Os chips de estatística continuam somando a tabela
+inteira independente do filtro (mesma decisão da Fase 12: "quantas propostas existem" e "o que
+estou vendo agora" são dois números diferentes). Isso exigiu uma terceira query só de contagem
+(`count(*)` com o mesmo `whereClause` dos itens) além do `GROUP BY status` sem filtro — sem ela,
+`hasMore` ficaria calculado contra o total errado (o de todos os status, não o do filtro atual) e
+a paginação apareceria mesmo quando a última página filtrada já tinha sido mostrada.
+`ApplicationsListPage.tsx`: busca por texto é debounced (300ms, `useEffect` — único lugar do
+projeto que usa isso pra estado local, já que não existe alternativa síncrona pra debounce), o
+filtro de status é um `<select>` direto. Um segundo `useEffect` observa `[status, search]` e
+reseta `page` pra 1 — sem isso, aplicar um filtro enquanto o dealer está na página 3 quase sempre
+mostraria "vazio" mesmo havendo resultado na página 1.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

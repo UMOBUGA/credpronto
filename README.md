@@ -122,3 +122,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 12 — reenvio de link do cliente, paginação da fila, visibilidade de consentimento
 - ✅ Fase 13 — feedback de erro nas ações do dealer, validação real de CPF na criação
 - ✅ Fase 14 — edição de proposta em draft/link_sent/client_submitted
+- ✅ Fase 15 — busca e filtro na fila de propostas

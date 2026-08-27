@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
 import { formatCurrency, formatDate } from '@/shared/lib/format'
 import { STATUS_LABELS } from '@/shared/statusLabels'
-import type { ApplicationSummary } from '@/shared/types'
+import type { ApplicationSummary, ApplicationStatus } from '@/shared/types'
 
 interface ApplicationsListResponse {
   items: ApplicationSummary[]
@@ -14,13 +14,36 @@ interface ApplicationsListResponse {
   stats: { total: number; reviewing: number; approved: number; closed: number }
 }
 
+const SEARCH_DEBOUNCE_MS = 300
+
 export default function ApplicationsListPage() {
   const [page, setPage] = useState(1)
+  const [status, setStatus] = useState<ApplicationStatus | ''>('')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+
+  // Debounce só do texto digitado — status já é um <select>, não precisa.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Qualquer mudança de filtro invalida a página em que o dealer estava —
+  // ficar na página 3 de um filtro novo quase sempre mostraria "vazio".
+  useEffect(() => {
+    setPage(1)
+  }, [status, search])
+
+  const params = new URLSearchParams({ page: String(page) })
+  if (status) params.set('status', status)
+  if (search) params.set('q', search)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['applications', page],
-    queryFn: () => apiFetch<ApplicationsListResponse>(`/api/applications?page=${page}`),
+    queryKey: ['applications', page, status, search],
+    queryFn: () => apiFetch<ApplicationsListResponse>(`/api/applications?${params.toString()}`),
   })
   const items = data?.items ?? []
+  const isFiltering = Boolean(status || search)
 
   return (
     <div className="page">
@@ -46,6 +69,28 @@ export default function ApplicationsListPage() {
           </div>
         </div>
       )}
+
+      <div className="list-filters">
+        <input
+          type="search"
+          placeholder="Buscar por marca, modelo ou placa"
+          aria-label="Buscar propostas"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        <select
+          aria-label="Filtrar por status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as ApplicationStatus | '')}
+        >
+          <option value="">Todos os status</option>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {isLoading ? (
         <table className="applications-table skeleton-table" aria-label="Carregando propostas">
@@ -81,10 +126,18 @@ export default function ApplicationsListPage() {
           >
             <path d="M4 4h16v16H4z M8 9h8 M8 13h5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <p>{page > 1 ? 'Nenhuma proposta nesta página.' : 'Nenhuma proposta ainda.'}</p>
-          <Link to="/nova" className="button">
-            Criar a primeira proposta
-          </Link>
+          <p>
+            {isFiltering
+              ? 'Nenhuma proposta encontrada com esse filtro.'
+              : page > 1
+                ? 'Nenhuma proposta nesta página.'
+                : 'Nenhuma proposta ainda.'}
+          </p>
+          {!isFiltering && (
+            <Link to="/nova" className="button">
+              Criar a primeira proposta
+            </Link>
+          )}
         </div>
       ) : (
         <>

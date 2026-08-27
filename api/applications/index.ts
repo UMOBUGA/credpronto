@@ -1,7 +1,12 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '../_lib/db'
-import { applicants, applications, type ApplicationStatus } from '../_lib/schema'
+import {
+  applicants,
+  applications,
+  applicationStatusEnum,
+  type ApplicationStatus,
+} from '../_lib/schema'
 import { encryptField, hashForLookup } from '../_lib/crypto'
 import { generateClientPortalToken, requireDealerSession } from '../_lib/auth'
 import { transition } from '../_lib/stateMachine'
@@ -51,19 +56,52 @@ const createSchema = z.object({
  * projeto de portfólio — sem cursor, sem índice extra). Antes disso a lista
  * cortava fixo em 100 registros sem nenhum jeito de ver o resto.
  */
+const STATUS_VALUES = new Set<string>(applicationStatusEnum.enumValues)
+
+/**
+ * Paginada por offset (`?page=`, padrão simples o bastante pro volume de um
+ * projeto de portfólio — sem cursor, sem índice extra). Antes disso a lista
+ * cortava fixo em 100 registros sem nenhum jeito de ver o resto.
+ *
+ * `?status=` (um valor exato do enum, silenciosamente ignorado se inválido)
+ * e `?q=` (Fase 15) filtram a lista — mas nunca os chips de estatística
+ * (`stats`), que continuam somando a tabela inteira: são dois conceitos
+ * diferentes, "quantas propostas existem no total" não deveria mudar só
+ * porque o dealer está filtrando a visão. `?q=` busca só em colunas não
+ * criptografadas (marca/modelo/placa) — nome/CPF do titular são cifrados e
+ * buscar neles exigiria decriptar linha a linha, fora de escopo aqui.
+ */
 async function handleList(
   req: Parameters<Handler>[0],
   res: Parameters<Handler>[1],
   db: Awaited<ReturnType<typeof getDb>>,
 ) {
-  const pageParam = Number(getUrl(req).searchParams.get('page'))
+  const params = getUrl(req).searchParams
+  const pageParam = Number(params.get('page'))
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
   const offset = (page - 1) * PAGE_SIZE
 
-  const [items, statusCounts] = await Promise.all([
+  const statusParam = params.get('status')
+  const status = statusParam && STATUS_VALUES.has(statusParam) ? statusParam : null
+  const q = params.get('q')?.trim() || null
+
+  const filters = [
+    status ? eq(applications.status, status as ApplicationStatus) : undefined,
+    q
+      ? or(
+          ilike(applications.vehicleMake, `%${q}%`),
+          ilike(applications.vehicleModel, `%${q}%`),
+          ilike(applications.vehiclePlate, `%${q}%`),
+        )
+      : undefined,
+  ].filter((clause) => clause !== undefined)
+  const whereClause = filters.length > 0 ? and(...filters) : undefined
+
+  const [items, statusCounts, [filteredCount]] = await Promise.all([
     db
       .select()
       .from(applications)
+      .where(whereClause)
       .orderBy(desc(applications.createdAt))
       .limit(PAGE_SIZE)
       .offset(offset),
@@ -71,6 +109,10 @@ async function handleList(
       .select({ status: applications.status, count: sql<number>`count(*)::int` })
       .from(applications)
       .groupBy(applications.status),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(applications)
+      .where(whereClause),
   ])
 
   let total = 0
@@ -88,7 +130,7 @@ async function handleList(
     items,
     page,
     pageSize: PAGE_SIZE,
-    hasMore: offset + items.length < total,
+    hasMore: offset + items.length < (filteredCount?.count ?? 0),
     stats: { total, reviewing, approved, closed },
   })
 }
