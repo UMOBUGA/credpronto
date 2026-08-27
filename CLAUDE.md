@@ -193,6 +193,61 @@ inseridas direto nas tabelas (sem passar por `transition()`/`logAction()`): é h
 para a demo funcionar de cara, não uma sequência real de eventos — não faria sentido aparecer na
 trilha de auditoria como se fosse.
 
+## Rodada 2 — navegação, documentos, avaliação veicular, redesign (Fases 7-10)
+
+Pedida pelo usuário depois de rodar o projeto localmente pela primeira vez (um bug relatado + três
+melhorias de produto/design). Fases 7-9 são mudanças pontuais; a Fase 10 é a repaginação visual
+completa. A Fase 11 (revalidação geral) fechou a rodada sem precisar de nenhuma correção de
+código — ver "Verificação real de ponta a ponta" abaixo.
+
+**Fase 7 — layout compartilhado do dealer**: `NewApplicationPage.tsx` e `ApplicationDetailPage.tsx`
+não tinham cabeçalho nenhum — só `ApplicationsListPage.tsx` tinha, então depois de criar uma
+proposta o usuário caía numa tela sem jeito de voltar. `src/dealer/components/DealerLayout.tsx` é
+agora a rota pai (nested routes do React Router) de toda rota autenticada do dealer, com cabeçalho
+persistente; cada página interna ainda ganhou um link contextual "← Voltar para propostas". Nessa
+mesma sessão foi corrigido um bug relacionado, mas anterior a esta rodada: `vite.portal-plugin.ts`
+reescrevia `/@react-refresh`/`/@vite/client` (módulos internos do Vite, sem ponto no nome) para
+`dealer.html` por engano — causava tela branca sempre, em qualquer navegador.
+
+**Fase 8 — documento com dado manual + passaporte**: `documents.manualFieldsEncrypted` (cifrado,
+mesma disciplina de todo campo PII) guarda o que o cliente digita junto com a foto no upload —
+redundância deliberada pro dealer comparar com o que a IA extraiu, útil sobretudo quando a
+extração falha ou pede revisão. `documentTypeEnum` ganhou `'passaporte'` como mais um tipo de
+documento de identidade — **CPF continua obrigatório pra todo comprador** (é o identificador do
+contrato de crédito no Brasil); passaporte não substitui isso, é só uma opção a mais pra
+comprador estrangeiro comprovar identidade. `src/shared/documentTypes.ts` é a fonte única de
+tipo/rótulo/campo manual esperado, reaproveitada pelo portal do cliente e pela revisão do dealer.
+
+**Fase 9 — FIPE na criação**: `lookupFipeValue()` (real, BrasilAPI, desde a Fase 3) já existia, só
+rodava tarde demais (dentro de `api/bureau/check.ts`, depois de todo o resto). Novo
+`GET /api/vehicles/fipe-lookup` é um wrapper fino que deixa o dealer consultar o valor já na tela
+de criação — puramente informativo, não persiste nada nem altera a proposta automaticamente
+(`decision.ts` continua o único lugar que decide algo).
+
+**Fase 10 — design system**: tipografia Sora (títulos) + Inter (corpo) via Google Fonts com
+fallback pra pilha de sistema (nunca quebra visualmente offline), paleta ampliada com tokens
+semânticos (success/warning/danger), botões em pílula, cards com sombra, badges com indicador de
+cor. Reaproveita as mesmas classes já existentes — poucas mudanças de markup, a maior parte é
+`src/shared/styles.css`. Adições novas: chips de contagem por status na fila
+(`ApplicationsListPage.tsx`), indicador de progresso no portal do cliente
+(`ProgressStepper.tsx`, derivado do `status` que a API já devolve, sem mudança de contrato).
+
+**Verificação real de ponta a ponta (Fase 11)**: além do pipeline automatizado, o caminho feliz
+completo foi exercitado com um navegador de verdade (Playwright headless) contra o dev server —
+criar proposta com consulta FIPE → cliente preenche dados com os 3 consentimentos granulares →
+envia passaporte com dado manual → autoriza Open Finance → dealer roda checagens → calcula decisão
+→ (sem oferta nesse caso, porque o mock de restrição veicular acusou restrição pra placa de teste,
+e `decision.ts` nega automático — comportamento correto, não bug). Sem `ANTHROPIC_API_KEY`
+configurada (ambiente local sem chave), tanto a extração de documento quanto o parecer de risco
+degradaram graciosamente exatamente como documentado (`documents.status = 'failed'` com retry
+manual; decisão persistiu com `risk_narrative_* = null` e botão "Gerar parecer") — confirma que a
+degradação sem IA funciona no fluxo real, não só nos testes mockados. Zero erros de console em
+todas as telas, nenhuma tela sem saída. Achados que não são bugs, mas ficaram registrados pra uma
+eventual fase futura: não existe UI pra reenviar/regenerar o link do cliente quando expira (o
+endpoint `POST /api/applications/[id]/link` existe desde a Fase 1, mas nunca foi conectado a um
+botão); `GET /api/applications` corta em 100 propostas sem paginação; a tela de detalhe não mostra
+quais dos consentimentos granulares (Fase 6/8) o cliente de fato marcou.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

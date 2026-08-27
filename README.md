@@ -45,10 +45,14 @@ com 4 propostas em estados diferentes:
    a sequência completa de decrypts que a tela de detalhe disparou.
 4. **Proposta em `link_sent`** — copie o link do portal do cliente (`/portal/:token` na própria
    URL) e complete o fluxo do zero: dados pessoais (com os 3 checkboxes de consentimento
-   granular), upload de documento (extração por IA se `ANTHROPIC_API_KEY` estiver configurada,
-   senão cai graciosamente em `failed` com retry manual), Open Finance simulado, checagens,
-   decisão, oferta.
-5. **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
+   granular), upload de documento — inclui a opção "Passaporte (estrangeiros)" com campo de
+   número/país digitados junto com a foto (extração por IA se `ANTHROPIC_API_KEY` estiver
+   configurada, senão cai graciosamente em `failed` com retry manual) —, Open Finance simulado,
+   checagens, decisão, oferta. Um indicador de progresso no topo do portal mostra em qual desses
+   passos o cliente está.
+5. **"Nova proposta"** — antes de criar, digite marca/modelo/ano e clique em "Consultar valor
+   FIPE" pra ver o valor de mercado real (BrasilAPI) já na hora de montar a proposta.
+6. **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
    mostra o que seria anonimizado sem escrever nada; sem `dryRun`, anonimiza de verdade quem já
    passou da janela de retenção (nenhuma das 4 propostas de exemplo qualifica — são recém-criadas).
 
@@ -82,3 +86,8 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 5 — Open Finance Brasil simulado (integração real exige autorização do Bacen — ver CLAUDE.md)
 - ✅ Fase 6 — hardening de LGPD (consentimento granular, mascaramento/revelação de PII, trilha de
   auditoria visível, retenção com anonimização, rate limiting) e polimento
+- ✅ Fase 7 — layout compartilhado do dealer (corrige navegação que ficava sem saída)
+- ✅ Fase 8 — upload de documento com dado manual + passaporte para comprador estrangeiro
+- ✅ Fase 9 — consulta do valor FIPE já na criação da proposta
+- ✅ Fase 10 — repaginação visual completa (tipografia, paleta, componentes)
+- ✅ Fase 11 — revalidação geral ponta a ponta (ver CLAUDE.md para os achados registrados)
