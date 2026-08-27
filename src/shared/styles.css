@@ -251,6 +251,44 @@ select:focus-visible {
   flex: 0 1 220px;
 }
 
+.metric-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metric-bar-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 40px;
+  align-items: center;
+  gap: 12px;
+}
+
+.metric-bar-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.metric-bar-track {
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  height: 12px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  background: var(--color-primary);
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width 0.2s ease;
+}
+
+.metric-bar-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: right;
+}
+
 .empty-state {
   background: var(--color-surface);
   border: 1px dashed var(--color-border);

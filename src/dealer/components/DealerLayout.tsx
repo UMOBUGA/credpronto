@@ -34,6 +34,9 @@ export function DealerLayout({ user }: Props) {
             <p>{user.name}</p>
           </div>
           <div className="page-actions">
+            <Link to="/metricas" className="button-secondary">
+              Métricas
+            </Link>
             {user.role === 'admin' && (
               <Link to="/usuarios" className="button-secondary">
                 Usuários

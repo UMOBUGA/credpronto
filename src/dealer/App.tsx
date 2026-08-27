@@ -6,6 +6,7 @@ import ApplicationsListPage from './pages/ApplicationsListPage'
 import NewApplicationPage from './pages/NewApplicationPage'
 import ApplicationDetailPage from './pages/ApplicationDetailPage'
 import DealerUsersPage from './pages/DealerUsersPage'
+import MetricsPage from './pages/MetricsPage'
 
 export default function App() {
   const { data, isLoading } = useSession()
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/nova" element={<NewApplicationPage />} />
         <Route path="/propostas/:id" element={<ApplicationDetailPage />} />
         <Route path="/usuarios" element={<DealerUsersPage />} />
+        <Route path="/metricas" element={<MetricsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

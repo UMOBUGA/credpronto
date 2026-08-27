@@ -386,6 +386,29 @@ uma tela quebrada antes do redirecionamento. A query da lista usa `enabled: role
 pelo mesmo motivo: todos os hooks de um componente rodam antes de qualquer `return` condicional,
 então sem isso a chamada (fadada a 403) sairia mesmo assim antes do redirect completar.
 
+**Fase 18 — dashboard de métricas**: nada agregava dado além do `GROUP BY status` dos chips da
+fila — tudo novo, sem tocar em PII. `REVIEW_STATUSES`/`SUCCESS_STATUSES`/`CLOSED_STATUSES` e o
+`GROUP BY` que os usa saíram de `api/applications/index.ts` pra `api/_lib/applicationStats.ts`
+(`getApplicationStatusCounts`), reaproveitado tanto pela fila (Fase 12/15) quanto por
+`api/metrics/summary.ts` — reuso, não duplicação da mesma classificação de status.
+`GET /api/metrics/summary` é aberto a qualquer papel autenticado (diferente de `reveal.ts`): só
+números agregados, nada sensível a restringir. Calcula taxa de aprovação e contagem por
+`outcome` a partir de `credit_decisions` (conta _decisões_, não propostas — uma revisão manual em
+`resolve.ts` grava uma segunda linha sem apagar a do motor, ver Fase 12), tempo médio entre
+`applications.createdAt` e `decidedAt` (só quem já tem `decidedAt`, via `isNotNull`) e distribuição
+de `scoreUsed` em 4 faixas. As faixas (`300–449`/`450–599`/`600–749`/`750–900`) são calibradas na
+escala real do bureau simulado (`checkBureauMock` sorteia 300-900) e alinhadas aos limiares que
+`decision.ts` já usa (`DENY_MAX_SCORE=450`, `APPROVE_MIN_SCORE=700`) — **não** uma escala 0-100
+genérica. `src/dealer/pages/MetricsPage.tsx` (rota `/metricas`, item de menu visível a todo papel)
+desenha as barras em CSS puro (`width` proporcional) — decisão deliberada de não adicionar
+Recharts só pra 2-3 gráficos de barra simples: diferente do painel-do-ar (que já carrega essa lib
+por necessidade própria), credpronto não tem esse dependency hoje, e um `<div>` com largura
+proporcional resolve sem aumentar o bundle. O seed de demonstração (Fase 6/"seed redondo") nunca
+passa por `transition()`, então nenhuma das 7 propostas de exemplo tem `decidedAt` — o card
+"Tempo médio até a decisão" mostra "—" com o banco recém-semeado, mesmo já existindo 4 decisões
+reais nele; é o comportamento correto, não um bug (confirmado rodando o dashboard contra o dev
+server real).
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

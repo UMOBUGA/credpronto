@@ -11,29 +11,11 @@ import { encryptField, hashForLookup } from '../_lib/crypto'
 import { generateClientPortalToken, requireDealerSession } from '../_lib/auth'
 import { transition } from '../_lib/stateMachine'
 import { notify } from '../_lib/notifications'
+import { getApplicationStatusCounts } from '../_lib/applicationStats'
 import { getUrl, readJsonBody, sendJson, type Handler } from '../_lib/http'
 
 const CLIENT_LINK_TTL_DAYS = 7
 const PAGE_SIZE = 25
-
-// Mesmos agrupamentos que os chips da fila usavam no frontend (Fase 10) —
-// movidos pro backend na Fase 12 porque com paginação um chip calculado só
-// em cima da página carregada ficaria enganoso (ex.: "1 aprovada" quando na
-// verdade há mais em outras páginas). Uma contagem `GROUP BY status` cobre
-// a tabela inteira, não só a página atual.
-const REVIEW_STATUSES = new Set<ApplicationStatus>(['manual_review', 'documents_review_required'])
-const SUCCESS_STATUSES = new Set<ApplicationStatus>([
-  'approved',
-  'offer_created',
-  'offer_sent',
-  'offer_accepted',
-])
-const CLOSED_STATUSES = new Set<ApplicationStatus>([
-  'denied',
-  'offer_declined',
-  'cancelled',
-  'expired',
-])
 
 const createSchema = z.object({
   applicant: z.object({
@@ -93,7 +75,7 @@ async function handleList(
   ].filter((clause) => clause !== undefined)
   const whereClause = filters.length > 0 ? and(...filters) : undefined
 
-  const [items, statusCounts, [filteredCount]] = await Promise.all([
+  const [items, stats, [filteredCount]] = await Promise.all([
     db
       .select()
       .from(applications)
@@ -101,33 +83,19 @@ async function handleList(
       .orderBy(desc(applications.createdAt))
       .limit(PAGE_SIZE)
       .offset(offset),
-    db
-      .select({ status: applications.status, count: sql<number>`count(*)::int` })
-      .from(applications)
-      .groupBy(applications.status),
+    getApplicationStatusCounts(db),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(applications)
       .where(whereClause),
   ])
 
-  let total = 0
-  let reviewing = 0
-  let approved = 0
-  let closed = 0
-  for (const row of statusCounts) {
-    total += row.count
-    if (REVIEW_STATUSES.has(row.status)) reviewing += row.count
-    if (SUCCESS_STATUSES.has(row.status)) approved += row.count
-    if (CLOSED_STATUSES.has(row.status)) closed += row.count
-  }
-
   sendJson(res, 200, {
     items,
     page,
     pageSize: PAGE_SIZE,
     hasMore: offset + items.length < (filteredCount?.count ?? 0),
-    stats: { total, reviewing, approved, closed },
+    stats,
   })
 }
 

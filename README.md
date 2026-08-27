@@ -84,6 +84,11 @@ Fora da fila:
   passar pelos gatilhos reais); "Reenviar link" adiciona uma segunda linha.
 - **"Usuários"** (só aparece pro papel admin, que é o do login do seed) — criar/desativar/
   reativar outro usuário da loja e trocar seu papel, sem sair da UI.
+- **"Métricas"** — taxa de aprovação, decisões por resultado e distribuição de score sobre as 7
+  propostas de exemplo (4 delas já têm decisão real). "Tempo médio até a decisão" aparece como
+  "—" com o banco recém-semeado — o seed não passa pelas transições reais, então nenhuma proposta
+  de exemplo tem `decidedAt`; rode o roteiro de demonstração (item 1) até uma decisão de verdade
+  pra ver esse número aparecer.
 - **Crons manualmente**: `curl -X POST http://localhost:5173/api/cron/retention-sweep?dryRun=true`
   mostra o que seria anonimizado sem escrever nada; sem `dryRun`, anonimiza de verdade quem já
   passou da janela de retenção (nenhuma das 7 propostas de exemplo qualifica de cara — são
@@ -130,3 +135,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 15 — busca e filtro na fila de propostas
 - ✅ Fase 16 — notificação simulada por e-mail
 - ✅ Fase 17 — gestão de usuários da loja (admin)
+- ✅ Fase 18 — dashboard de métricas

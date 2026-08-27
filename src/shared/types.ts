@@ -164,6 +164,16 @@ export interface NotificationLogEntry {
   sentAt: string
 }
 
+/** `GET /api/metrics/summary` (Fase 18) — só números agregados, nenhuma PII. */
+export interface MetricsSummary {
+  statusCounts: { total: number; reviewing: number; approved: number; closed: number }
+  totalDecisions: number
+  approvalRate: number | null
+  outcomeBreakdown: { approved: number; denied: number; manual_review: number }
+  averageDecisionHours: number | null
+  scoreDistribution: { label: string; count: number }[]
+}
+
 export interface AuditLogEntry {
   id: string
   occurredAt: string
