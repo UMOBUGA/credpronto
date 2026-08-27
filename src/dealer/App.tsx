@@ -5,6 +5,7 @@ import { DealerLayout } from './components/DealerLayout'
 import ApplicationsListPage from './pages/ApplicationsListPage'
 import NewApplicationPage from './pages/NewApplicationPage'
 import ApplicationDetailPage from './pages/ApplicationDetailPage'
+import DealerUsersPage from './pages/DealerUsersPage'
 
 export default function App() {
   const { data, isLoading } = useSession()
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/" element={<ApplicationsListPage />} />
         <Route path="/nova" element={<NewApplicationPage />} />
         <Route path="/propostas/:id" element={<ApplicationDetailPage />} />
+        <Route path="/usuarios" element={<DealerUsersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

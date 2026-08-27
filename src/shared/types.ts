@@ -26,6 +26,15 @@ export interface DealerUser {
   role: 'admin' | 'manager' | 'analyst'
 }
 
+/**
+ * Só usada pela tela de gestão de usuários (Fase 17, `admin`) —
+ * `GET /api/auth/session` devolve `DealerUser` puro, sem esses dois campos.
+ */
+export interface DealerUserManagementEntry extends DealerUser {
+  createdAt: string
+  disabledAt: string | null
+}
+
 export interface ApplicationSummary {
   id: string
   applicantId: string

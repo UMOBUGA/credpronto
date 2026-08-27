@@ -367,6 +367,25 @@ de novo pro cliente saber até um humano resolver) e resolução manual em `reso
 (`offer_created`). `api/applications/[id].ts` inclui a lista em `notifications`, mesmo padrão de
 `consents` (Fase 12); nova seção "Notificações" no detalhe.
 
+**Fase 17 — gestão de usuários da loja**: `dealerRoleEnum`/`dealerUsers.disabledAt`
+(`schema.ts`) e `requireDealerRole()` (`auth.ts`, já usado por `reveal.ts` desde a Fase 6) já
+existiam — essa fase é só o CRUD que faltava. `api/dealers/index.ts` (`GET` lista, `POST` cria) e
+`api/dealers/[id].ts` (`PATCH` troca `role` e/ou `disabled`) são restritos a `role: 'admin'`.
+Nenhum dos dois usa `.returning(colunas)` do drizzle-orm pra nunca devolver `passwordHash` — essa
+sintaxe não existe nessa API (só `.select()` aceita objeto de colunas); em vez disso,
+`toSafeUser()` copia explicitamente os campos seguros a partir do retorno de `.returning()` puro
+(desestruturar `passwordHash` só pra descartar dispararia `no-unused-vars`). Sem fluxo de convite
+por e-mail: o próprio admin define a senha inicial no formulário — simplificação deliberada de
+portfólio (se a Fase 16 já existir, notificar o novo usuário seria uma extensão natural, não um
+pré-requisito). Um admin **nunca** consegue desativar a própria conta (`PATCH` recusa com 409) —
+evita o cenário de o último admin logado se trancar fora do painel sem ninguém pra reverter.
+`src/dealer/pages/DealerUsersPage.tsx` (rota `/usuarios`) e o item de menu em `DealerLayout.tsx`
+só aparecem pra `admin`; a página também redireciona (`<Navigate to="/" />`) quem chegar lá por
+URL direta sem ser admin — o backend já recusaria com 403 de qualquer forma, isso só evita mostrar
+uma tela quebrada antes do redirecionamento. A query da lista usa `enabled: role === 'admin'`
+pelo mesmo motivo: todos os hooks de um componente rodam antes de qualquer `return` condicional,
+então sem isso a chamada (fadada a 403) sairia mesmo assim antes do redirect completar.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

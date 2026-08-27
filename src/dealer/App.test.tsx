@@ -220,4 +220,47 @@ describe('App (dealer)', () => {
 
     expect(await screen.findByText('Nenhuma notificação disparada ainda.')).toBeInTheDocument()
   })
+
+  it('mostra o link "Usuários" no menu só pra admin (Fase 17)', async () => {
+    server.use(
+      http.get('/api/auth/session', () =>
+        HttpResponse.json({
+          user: { id: '1', name: 'Dealer Teste', email: 'd@example.test', role: 'admin' },
+        }),
+      ),
+    )
+    renderWithQuery(<App />)
+
+    expect(await screen.findByRole('link', { name: 'Usuários' })).toBeInTheDocument()
+  })
+
+  it('esconde o link "Usuários" do menu pra manager/analyst (Fase 17)', async () => {
+    server.use(
+      http.get('/api/auth/session', () =>
+        HttpResponse.json({
+          user: { id: '1', name: 'Dealer Teste', email: 'd@example.test', role: 'analyst' },
+        }),
+      ),
+    )
+    renderWithQuery(<App />)
+
+    await screen.findByText('Dealer Teste')
+    expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument()
+  })
+
+  it('redireciona quem não é admin ao navegar direto pra /usuarios (Fase 17)', async () => {
+    server.use(
+      http.get('/api/auth/session', () =>
+        HttpResponse.json({
+          user: { id: '1', name: 'Dealer Teste', email: 'd@example.test', role: 'analyst' },
+        }),
+      ),
+      // A página monta (e dispara essa busca) antes do guard de role redirecionar —
+      // só evita o aviso de "unhandled request" do MSW, a resposta em si é descartada.
+      http.get('/api/dealers', () => HttpResponse.json([])),
+    )
+    renderWithQuery(<App />, { route: '/usuarios' })
+
+    expect(await screen.findByText('Nenhuma proposta ainda.')).toBeInTheDocument()
+  })
 })
