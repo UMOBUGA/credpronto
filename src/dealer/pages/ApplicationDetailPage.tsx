@@ -5,8 +5,10 @@ import { apiFetch } from '@/shared/lib/api'
 import { formatCpf, formatCurrency, formatDate } from '@/shared/lib/format'
 import { STATUS_LABELS } from '@/shared/statusLabels'
 import type { ConsentType, ApplicationDetail } from '@/shared/types'
+import { EDITABLE_STATUSES } from '@/shared/editableStatuses'
 import { DocumentReviewCard } from '../components/DocumentReviewCard'
 import { AuditLogPanel } from '../components/AuditLogPanel'
+import { EditApplicationForm } from '../components/EditApplicationForm'
 import { useSession } from '../hooks/useSession'
 
 const REVEAL_ROLES = new Set(['admin', 'manager'])
@@ -112,6 +114,10 @@ export default function ApplicationDetailPage() {
         {data.vehicleMake} {data.vehicleModel} ({data.vehicleYear}) — {data.vehiclePlate}
       </h1>
       <span className={`status-badge status-${data.status}`}>{STATUS_LABELS[data.status]}</span>
+
+      {EDITABLE_STATUSES.has(data.status) && (
+        <EditApplicationForm application={data} onSaved={invalidate} />
+      )}
 
       <section className="detail-section">
         <h2>Comprador</h2>

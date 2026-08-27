@@ -27,6 +27,7 @@ const patchSchema = z.object({
   vehicleModel: z.string().min(1).optional(),
   vehicleYear: z.number().int().optional(),
   vehiclePrice: z.number().positive().optional(),
+  vehiclePlate: z.string().min(1).optional(),
   downPayment: z.number().min(0).optional(),
   requestedAmount: z.number().positive().optional(),
   requestedTermMonths: z.number().int().positive().optional(),

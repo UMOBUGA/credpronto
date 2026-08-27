@@ -314,6 +314,25 @@ O mesmo padrão (mutação sem `isError` tratado) se repetia em quase toda açã
 uma mensagem específica, mesmo padrão simples (`{mutation.isError && <p className="form-error">...</p>}`)
 que o portal do cliente já usava — sem componente novo, sem abstração.
 
+## Rodada 3 — novas adições à esteira (Fase 14 em diante)
+
+Depois de reconstruir o banco de demonstração local (7 propostas ricas, ver seção "Dado de
+demonstração" acima), o usuário pediu sugestões de melhoria pra esteira; seis foram curadas e
+planejadas como fases próprias (14-19), aprovadas uma a uma. Plano completo em
+`C:\Users\Gustavo\.claude\plans\streamed-percolating-quilt.md`.
+
+**Fase 14 — edição de proposta em `draft`/`link_sent`/`client_submitted`**: o backend
+(`handlePatch` em `api/applications/[id].ts`) já existia desde cedo no projeto e nunca tinha UI —
+essa fase é quase inteiramente frontend. Única lacuna real do backend: `vehiclePlate` não estava
+no `patchSchema` apesar de ser coluna `NOT NULL` — corrigido. `src/shared/editableStatuses.ts`
+duplica a constante `EDITABLE_STATUSES` do backend (mesmo motivo de `cpfValidation.ts` na Fase
+13: frontend não importa de `api/_lib`) só pra decidir se mostra o formulário — o backend
+continua sendo a única fonte de verdade, recusando com 409 fora desses três status independente
+do que a UI decidir renderizar. `src/dealer/components/EditApplicationForm.tsx` é um componente
+à parte (não inline em `ApplicationDetailPage.tsx`) que recebe a proposta já carregada como prop
+e inicializa seu próprio estado via inicializador preguiçoso do `useState` — dispensa `useEffect`
+de sincronização porque a página inteira remonta ao trocar de proposta (rota por `id`).
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

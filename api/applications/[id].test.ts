@@ -67,3 +67,59 @@ describe('GET /api/applications/[id] — visibilidade de consentimento (Fase 12)
     expect((res.body as { consents: unknown[] }).consents).toEqual([])
   })
 })
+
+describe('PATCH /api/applications/[id] — edição de proposta (Fase 14)', () => {
+  it('atualiza os campos editáveis, incluindo a placa, enquanto a proposta está em draft', async () => {
+    const db = await getDb()
+    const dealer = await seedDealerUser(db)
+    const applicant = await seedApplicant(db)
+    const application = await seedApplication(db, {
+      applicantId: applicant.id,
+      dealerUserId: dealer.id,
+    })
+    const cookie = `${SESSION_COOKIE_NAME}=${createSessionToken(dealer.id)}`
+
+    const res = mockRes()
+    await applicationDetailHandler(
+      mockReq(`/api/applications/${application.id}`, {
+        method: 'PATCH',
+        headers: { cookie },
+        body: { vehiclePlate: 'XYZ9K88', requestedAmount: 65000 },
+      }),
+      res,
+    )
+
+    expect(res.statusCode).toBe(200)
+    const body = res.body as { vehiclePlate: string; requestedAmount: number }
+    expect(body.vehiclePlate).toBe('XYZ9K88')
+    expect(body.requestedAmount).toBe(65000)
+  })
+
+  it('recusa a edição com 409 fora dos status editáveis', async () => {
+    const db = await getDb()
+    const dealer = await seedDealerUser(db)
+    const applicant = await seedApplicant(db)
+    const application = await seedApplication(db, {
+      applicantId: applicant.id,
+      dealerUserId: dealer.id,
+    })
+    const actor = { actorType: 'dealer_user' as const, actorId: dealer.id }
+    await transition(db, application.id, 'link_sent', actor)
+    await transition(db, application.id, 'client_submitted', actor)
+    await transition(db, application.id, 'processing_documents', actor)
+
+    const cookie = `${SESSION_COOKIE_NAME}=${createSessionToken(dealer.id)}`
+    const res = mockRes()
+    await applicationDetailHandler(
+      mockReq(`/api/applications/${application.id}`, {
+        method: 'PATCH',
+        headers: { cookie },
+        body: { requestedAmount: 65000 },
+      }),
+      res,
+    )
+
+    expect(res.statusCode).toBe(409)
+    expect((res.body as { error: string }).error).toBe('not_editable')
+  })
+})

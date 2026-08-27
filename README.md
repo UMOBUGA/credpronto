@@ -48,7 +48,9 @@ então cada resultado é uma consequência real da regra, não um valor fixo des
    checkboxes de consentimento granular), upload de documento — inclui a opção "Passaporte
    (estrangeiros)" com número/país digitados junto com a foto —, Open Finance simulado,
    checagens, decisão, oferta. O indicador de progresso no topo do portal mostra em qual desses
-   passos o cliente está.
+   passos o cliente está. Como `link_sent` ainda é um status editável (Fase 14), a tela de
+   detalhe também mostra "Editar proposta" — dá pra corrigir marca/modelo/placa/valores antes de
+   o cliente sequer abrir o link.
 2. **VW Polo — `documents_review_required`** — um RG com confiança baixa (58%) parado esperando
    revisão: os campos extraídos pela IA aparecem editáveis ao lado do número de documento que o
    próprio cliente digitou no envio, pra comparar. Clique em "Aprovar" ou "Rejeitar".
@@ -119,3 +121,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 11 — revalidação geral ponta a ponta (ver CLAUDE.md para os achados registrados)
 - ✅ Fase 12 — reenvio de link do cliente, paginação da fila, visibilidade de consentimento
 - ✅ Fase 13 — feedback de erro nas ações do dealer, validação real de CPF na criação
+- ✅ Fase 14 — edição de proposta em draft/link_sent/client_submitted
