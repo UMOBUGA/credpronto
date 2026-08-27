@@ -22,6 +22,11 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     environmentMatchGlobs: [['api/**', 'node']],
+    // `e2e/**` usa o runner do Playwright (`npm run test:e2e`), não o do
+    // Vitest — sem isto, `dealer-flow.spec.ts` bateria no glob padrão de
+    // teste do Vitest (`*.spec.ts`) e falharia por usar `test`/`expect` do
+    // `@playwright/test`, não os globals do Vitest.
+    exclude: ['**/node_modules/**', 'e2e/**'],
     setupFiles: ['./vitest.setup.ts'],
     // Os testes de integração de api/ fazem várias idas ao PGlite em
     // sequência de propósito (decrypt/transição de estado precisam ser

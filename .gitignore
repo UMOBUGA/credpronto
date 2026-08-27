@@ -6,5 +6,9 @@ coverage
 .vite
 *.tsbuildinfo
 .pglite-data
+.pglite-data-e2e
 .data
 .env
+test-results
+playwright-report
+blob-report

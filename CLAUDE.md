@@ -409,6 +409,37 @@ passa por `transition()`, então nenhuma das 7 propostas de exemplo tem `decided
 reais nele; é o comportamento correto, não um bug (confirmado rodando o dashboard contra o dev
 server real).
 
+**Fase 19 — suíte de E2E formal (Playwright + CI)**: até aqui, toda verificação em navegador real
+deste projeto era um script `.mjs` ad-hoc no scratchpad, nunca commitado nem rodado em CI —
+formalizado nesta fase. `e2e/dealer-flow.spec.ts` cobre só 3 caminhos críticos (login, criar
+proposta e navegar até o detalhe sem "ficar preso" — a regressão real da Fase 7 — e CPF inválido
+bloqueando o submit no navegador), deliberadamente enxuto: a suíte de negócio já está coberta por
+`npm test` (MSW/PGlite); o E2E existe pra pegar regressão de renderização/interação no navegador
+real, não pra reimplementar tudo.
+
+Isolamento de banco é o cuidado central desta fase: os testes **nunca** tocam o `.pglite-data` de
+desenvolvimento. `api/_lib/db.ts` ganhou `PGLITE_DATA_DIR` (mesmo padrão de "presença de env var
+escolhe o caminho" já usado em `DATABASE_URL`/`OPENFINANCE_ENABLED`/`NOTIFICATIONS_ENABLED`) —
+`playwright.config.ts` aponta o dev server que ele mesmo sobe (`vite --port 5183 --strictPort`,
+porta dedicada pra nunca colidir com um `npm run dev` que o dealer já tenha aberto na 5173) pra um
+arquivo à parte, `.pglite-data-e2e`. `e2e/global-setup.ts` roda uma vez antes de tudo: apaga esse
+arquivo e roda `scripts/seed.ts` (o mesmo do `npm run db:seed`) **como processo filho separado**,
+nunca importando `getDb()` no processo do test runner — mesmo cuidado documentado mais acima pra
+nunca ter duas escritas concorrentes no mesmo PGlite: o processo de seed abre, escreve e fecha
+antes do dev server (outro processo) sequer tentar abrir o mesmo arquivo. `DATABASE_URL` é
+explicitamente removida/zerada tanto no `globalSetup` quanto no `webServer.env` — se por acaso
+estiver definida no ambiente, `getDb()` a preferiria sobre PGlite e ignoraria `PGLITE_DATA_DIR`
+por completo (`webServer.env` do Playwright só _adiciona_ a `process.env`, não substitui).
+
+Os 3 testes criam seus próprios dados pela UI de verdade (`e2e/helpers.ts::createApplicationViaUi`,
+sempre com um CPF já validado e uma placa única por timestamp) em vez de depender do conteúdo do
+seed de demonstração — evita acoplar os testes a dado que pode mudar. `e2e/**` é excluído do
+`test.exclude` do Vitest em `vite.config.ts`: sem isso, o padrão de teste padrão do Vitest
+(`*.spec.ts`) capturaria `dealer-flow.spec.ts` e tentaria rodá-lo com os globals errados. CI
+(`.github/workflows/ci.yml`) roda `npx playwright install --with-deps chromium` seguido de
+`npm run test:e2e` depois do build de produção, com o relatório HTML como artifact só em caso de
+falha (`if: failure()`, diferente do artifact de cobertura que sempre sobe).
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

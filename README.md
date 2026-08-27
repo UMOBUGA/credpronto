@@ -104,6 +104,8 @@ npm run lint               # eslint .
 npm run format              # prettier --write .
 npm test                    # vitest run
 npm run test:coverage       # vitest run --coverage
+npm run test:e2e              # playwright test — sobe seu próprio dev server (porta 5183) e
+                               # semeia um banco isolado (.pglite-data-e2e), nunca toca no seu
 npm run db:generate          # gera migração SQL a partir de api/_lib/schema.ts
 npm run db:migrate            # aplica migrações (só necessário com DATABASE_URL real)
 npm run db:seed                # cria o usuário dealer de desenvolvimento
@@ -136,3 +138,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 16 — notificação simulada por e-mail
 - ✅ Fase 17 — gestão de usuários da loja (admin)
 - ✅ Fase 18 — dashboard de métricas
+- ✅ Fase 19 — suíte de E2E formal (Playwright + CI)

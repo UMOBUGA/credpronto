@@ -28,9 +28,16 @@ async function openPglite() {
   // Em teste, cada arquivo de teste roda em seu próprio worker; um caminho de
   // arquivo compartilhado causaria os workers disputando o mesmo banco em
   // paralelo. `memory://` dá a cada um uma instância isolada e descartável.
+  // `PGLITE_DATA_DIR` (Fase 19) aponta a suíte E2E pra um arquivo à parte do
+  // `.pglite-data` de desenvolvimento — nunca corrompe o banco de demo que o
+  // dealer usa localmente.
   const client = process.env.VITEST
     ? new PGlite('memory://')
-    : new PGlite(path.resolve(here, '../../.pglite-data'))
+    : new PGlite(
+        process.env.PGLITE_DATA_DIR
+          ? path.resolve(process.env.PGLITE_DATA_DIR)
+          : path.resolve(here, '../../.pglite-data'),
+      )
   const db = drizzle(client, { schema })
   await migrate(db, { migrationsFolder })
   return db

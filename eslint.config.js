@@ -5,7 +5,18 @@ import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'drizzle', '.pglite-data', '.data'] },
+  {
+    ignores: [
+      'dist',
+      'coverage',
+      'drizzle',
+      '.pglite-data',
+      '.pglite-data-e2e',
+      '.data',
+      'test-results',
+      'playwright-report',
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
