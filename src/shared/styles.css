@@ -220,6 +220,14 @@ input {
   font-weight: 600;
 }
 
+.fipe-lookup {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
 .applications-table {
   width: 100%;
   border-collapse: collapse;

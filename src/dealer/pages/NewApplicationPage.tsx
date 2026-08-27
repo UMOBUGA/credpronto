@@ -2,10 +2,19 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
+import { formatCurrency } from '@/shared/lib/format'
 
 interface CreateResponse {
   id: string
   portalPath: string
+}
+
+interface FipeLookupResult {
+  fipeValue: number | null
+  fipeCode: string | null
+  fipeBrand: string | null
+  fipeModel: string | null
+  fipeYear: string | null
 }
 
 interface FormState {
@@ -42,6 +51,19 @@ export default function NewApplicationPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
+  const [fipeResult, setFipeResult] = useState<FipeLookupResult | null>(null)
+
+  const fipeLookup = useMutation({
+    mutationFn: () => {
+      const params = new URLSearchParams({
+        make: form.vehicleMake,
+        model: form.vehicleModel,
+        year: String(form.vehicleYear),
+      })
+      return apiFetch<FipeLookupResult>(`/api/vehicles/fipe-lookup?${params.toString()}`)
+    },
+    onSuccess: setFipeResult,
+  })
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -73,6 +95,20 @@ export default function NewApplicationPage() {
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  function setVehicleField<K extends 'vehicleMake' | 'vehicleModel' | 'vehicleYear'>(
+    key: K,
+    value: FormState[K],
+  ) {
+    set(key, value)
+    setFipeResult(null)
+  }
+
+  const canLookupFipe = Boolean(form.vehicleMake && form.vehicleModel && form.vehicleYear)
+  const ltvRatio =
+    fipeResult?.fipeValue && form.requestedAmount
+      ? form.requestedAmount / fipeResult.fipeValue
+      : null
 
   return (
     <div className="page">
@@ -121,7 +157,7 @@ export default function NewApplicationPage() {
             Marca
             <input
               value={form.vehicleMake}
-              onChange={(e) => set('vehicleMake', e.target.value)}
+              onChange={(e) => setVehicleField('vehicleMake', e.target.value)}
               required
             />
           </label>
@@ -129,7 +165,7 @@ export default function NewApplicationPage() {
             Modelo
             <input
               value={form.vehicleModel}
-              onChange={(e) => set('vehicleModel', e.target.value)}
+              onChange={(e) => setVehicleField('vehicleModel', e.target.value)}
               required
             />
           </label>
@@ -138,10 +174,47 @@ export default function NewApplicationPage() {
             <input
               type="number"
               value={form.vehicleYear}
-              onChange={(e) => set('vehicleYear', Number(e.target.value))}
+              onChange={(e) => setVehicleField('vehicleYear', Number(e.target.value))}
               required
             />
           </label>
+          <div className="fipe-lookup">
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => fipeLookup.mutate()}
+              disabled={!canLookupFipe || fipeLookup.isPending}
+            >
+              {fipeLookup.isPending ? 'Consultando…' : 'Consultar valor FIPE'}
+            </button>
+            {fipeLookup.isSuccess && (
+              <p className="hint-text">
+                {fipeResult?.fipeValue != null ? (
+                  <>
+                    Valor FIPE: {formatCurrency(fipeResult.fipeValue)}
+                    {fipeResult.fipeBrand && fipeResult.fipeModel && (
+                      <>
+                        {' '}
+                        ({fipeResult.fipeBrand} {fipeResult.fipeModel})
+                      </>
+                    )}
+                    {ltvRatio != null && (
+                      <>
+                        {' '}
+                        — valor solicitado corresponde a {(ltvRatio * 100).toFixed(0)}% do valor
+                        FIPE
+                      </>
+                    )}
+                  </>
+                ) : (
+                  'Valor FIPE não encontrado para essa marca/modelo/ano — a loja pode seguir com o valor digitado.'
+                )}
+              </p>
+            )}
+            {fipeLookup.isError && (
+              <p className="hint-text">Não foi possível consultar a FIPE agora.</p>
+            )}
+          </div>
           <label>
             Preço do veículo
             <input
