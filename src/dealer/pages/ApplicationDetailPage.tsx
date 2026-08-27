@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
 import { formatCpf, formatCurrency } from '@/shared/lib/format'
@@ -86,6 +86,9 @@ export default function ApplicationDetailPage() {
 
   return (
     <div className="page">
+      <Link to="/" className="back-link">
+        ← Voltar para propostas
+      </Link>
       <h1>
         {data.vehicleMake} {data.vehicleModel} ({data.vehicleYear}) — {data.vehiclePlate}
       </h1>

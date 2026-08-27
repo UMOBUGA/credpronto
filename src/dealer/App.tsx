@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useSession } from './hooks/useSession'
 import LoginPage from './pages/LoginPage'
+import { DealerLayout } from './components/DealerLayout'
 import ApplicationsListPage from './pages/ApplicationsListPage'
 import NewApplicationPage from './pages/NewApplicationPage'
 import ApplicationDetailPage from './pages/ApplicationDetailPage'
@@ -20,10 +21,12 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<ApplicationsListPage user={data.user} />} />
-      <Route path="/nova" element={<NewApplicationPage />} />
-      <Route path="/propostas/:id" element={<ApplicationDetailPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route element={<DealerLayout user={data.user} />}>
+        <Route path="/" element={<ApplicationsListPage />} />
+        <Route path="/nova" element={<NewApplicationPage />} />
+        <Route path="/propostas/:id" element={<ApplicationDetailPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
     </Routes>
   )
 }

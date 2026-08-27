@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
 
@@ -76,6 +76,9 @@ export default function NewApplicationPage() {
 
   return (
     <div className="page">
+      <Link to="/" className="back-link">
+        ← Voltar para propostas
+      </Link>
       <h1>Nova proposta</h1>
       <form
         className="form-grid"

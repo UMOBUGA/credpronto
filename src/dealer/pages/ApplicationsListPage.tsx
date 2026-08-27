@@ -1,38 +1,19 @@
 import { Link } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
 import { formatCurrency, formatDate } from '@/shared/lib/format'
 import { STATUS_LABELS } from '@/shared/statusLabels'
-import type { ApplicationSummary, DealerUser } from '@/shared/types'
+import type { ApplicationSummary } from '@/shared/types'
 
-export default function ApplicationsListPage({ user }: { user: DealerUser }) {
-  const queryClient = useQueryClient()
+export default function ApplicationsListPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['applications'],
     queryFn: () => apiFetch<ApplicationSummary[]>('/api/applications'),
   })
 
-  async function logout() {
-    await apiFetch('/api/auth/logout', { method: 'POST' })
-    queryClient.setQueryData(['session'], { user: null })
-  }
-
   return (
     <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>credpronto</h1>
-          <p>{user.name}</p>
-        </div>
-        <div className="page-actions">
-          <Link to="/nova" className="button">
-            Nova proposta
-          </Link>
-          <button className="button-secondary" onClick={() => void logout()}>
-            Sair
-          </button>
-        </div>
-      </header>
+      <h1 className="page-title">Propostas</h1>
 
       {isLoading ? (
         <p>Carregando propostas…</p>
