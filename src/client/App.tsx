@@ -5,6 +5,7 @@ import type { ApplicationStatus, DocumentSummary } from '@/shared/types'
 import { PersonalDataForm } from './components/PersonalDataForm'
 import { DocumentsSection } from './components/DocumentsSection'
 import { OpenFinanceConsentStep } from './components/OpenFinanceConsentStep'
+import { ProgressStepper } from './components/ProgressStepper'
 
 interface ClientView {
   status: ApplicationStatus
@@ -71,6 +72,8 @@ export default function App() {
         Sua proposta — {data.vehicle.make} {data.vehicle.model}
       </h1>
       <p>{STATUS_LABELS[data.status]}</p>
+
+      <ProgressStepper status={data.status} />
 
       {!data.hasSubmittedDetails ? (
         <PersonalDataForm token={token} onSubmitted={invalidate} />
