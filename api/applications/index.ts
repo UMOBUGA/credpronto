@@ -1,13 +1,33 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb } from '../_lib/db'
 import { applicants, applications, type ApplicationStatus } from '../_lib/schema'
 import { encryptField, hashForLookup } from '../_lib/crypto'
 import { generateClientPortalToken, requireDealerSession } from '../_lib/auth'
 import { transition } from '../_lib/stateMachine'
-import { readJsonBody, sendJson, type Handler } from '../_lib/http'
+import { getUrl, readJsonBody, sendJson, type Handler } from '../_lib/http'
 
 const CLIENT_LINK_TTL_DAYS = 7
+const PAGE_SIZE = 25
+
+// Mesmos agrupamentos que os chips da fila usavam no frontend (Fase 10) —
+// movidos pro backend na Fase 12 porque com paginação um chip calculado só
+// em cima da página carregada ficaria enganoso (ex.: "1 aprovada" quando na
+// verdade há mais em outras páginas). Uma contagem `GROUP BY status` cobre
+// a tabela inteira, não só a página atual.
+const REVIEW_STATUSES = new Set<ApplicationStatus>(['manual_review', 'documents_review_required'])
+const SUCCESS_STATUSES = new Set<ApplicationStatus>([
+  'approved',
+  'offer_created',
+  'offer_sent',
+  'offer_accepted',
+])
+const CLOSED_STATUSES = new Set<ApplicationStatus>([
+  'denied',
+  'offer_declined',
+  'cancelled',
+  'expired',
+])
 
 const createSchema = z.object({
   applicant: z.object({
@@ -26,9 +46,51 @@ const createSchema = z.object({
   requestedTermMonths: z.number().int().positive(),
 })
 
-async function handleList(res: Parameters<Handler>[1], db: Awaited<ReturnType<typeof getDb>>) {
-  const rows = await db.select().from(applications).orderBy(desc(applications.createdAt)).limit(100)
-  sendJson(res, 200, rows)
+/**
+ * Paginada por offset (`?page=`, padrão simples o bastante pro volume de um
+ * projeto de portfólio — sem cursor, sem índice extra). Antes disso a lista
+ * cortava fixo em 100 registros sem nenhum jeito de ver o resto.
+ */
+async function handleList(
+  req: Parameters<Handler>[0],
+  res: Parameters<Handler>[1],
+  db: Awaited<ReturnType<typeof getDb>>,
+) {
+  const pageParam = Number(getUrl(req).searchParams.get('page'))
+  const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1
+  const offset = (page - 1) * PAGE_SIZE
+
+  const [items, statusCounts] = await Promise.all([
+    db
+      .select()
+      .from(applications)
+      .orderBy(desc(applications.createdAt))
+      .limit(PAGE_SIZE)
+      .offset(offset),
+    db
+      .select({ status: applications.status, count: sql<number>`count(*)::int` })
+      .from(applications)
+      .groupBy(applications.status),
+  ])
+
+  let total = 0
+  let reviewing = 0
+  let approved = 0
+  let closed = 0
+  for (const row of statusCounts) {
+    total += row.count
+    if (REVIEW_STATUSES.has(row.status)) reviewing += row.count
+    if (SUCCESS_STATUSES.has(row.status)) approved += row.count
+    if (CLOSED_STATUSES.has(row.status)) closed += row.count
+  }
+
+  sendJson(res, 200, {
+    items,
+    page,
+    pageSize: PAGE_SIZE,
+    hasMore: offset + items.length < total,
+    stats: { total, reviewing, approved, closed },
+  })
 }
 
 async function handleCreate(
@@ -109,7 +171,7 @@ const handler: Handler = async (req, res) => {
     return
   }
 
-  await handleList(res, db)
+  await handleList(req, res, db)
 }
 
 export default handler

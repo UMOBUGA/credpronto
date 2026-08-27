@@ -2,14 +2,28 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/lib/api'
-import { formatCpf, formatCurrency } from '@/shared/lib/format'
+import { formatCpf, formatCurrency, formatDate } from '@/shared/lib/format'
 import { STATUS_LABELS } from '@/shared/statusLabels'
-import type { ApplicationDetail } from '@/shared/types'
+import type { ConsentType, ApplicationDetail } from '@/shared/types'
 import { DocumentReviewCard } from '../components/DocumentReviewCard'
 import { AuditLogPanel } from '../components/AuditLogPanel'
 import { useSession } from '../hooks/useSession'
 
 const REVEAL_ROLES = new Set(['admin', 'manager'])
+
+const CONSENT_TYPES: ConsentType[] = [
+  'data_processing',
+  'bureau_check',
+  'ai_narrative_share',
+  'openfinance_share',
+]
+
+const CONSENT_LABELS: Record<ConsentType, string> = {
+  data_processing: 'Tratamento de dados (LGPD)',
+  bureau_check: 'Consulta ao bureau de crédito',
+  ai_narrative_share: 'Parecer de risco gerado por IA',
+  openfinance_share: 'Compartilhamento via Open Finance',
+}
 
 export default function ApplicationDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -77,6 +91,11 @@ export default function ApplicationDetailPage() {
 
   const retryNarrative = useMutation({
     mutationFn: () => apiFetch(`/api/applications/${id}/narrative`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+
+  const resendLink = useMutation({
+    mutationFn: () => apiFetch(`/api/applications/${id}/link`, { method: 'POST' }),
     onSuccess: invalidate,
   })
 
@@ -155,6 +174,38 @@ export default function ApplicationDetailPage() {
         <p>
           <code>{portalUrl}</code>
         </p>
+        <button
+          type="button"
+          className="button-secondary"
+          onClick={() => resendLink.mutate()}
+          disabled={resendLink.isPending}
+        >
+          {resendLink.isPending ? 'Gerando novo link…' : 'Reenviar link'}
+        </button>
+        {resendLink.isSuccess && (
+          <p className="hint-text">Link renovado — o anterior parou de funcionar.</p>
+        )}
+      </section>
+
+      <section className="detail-section">
+        <h2>Consentimentos</h2>
+        <dl>
+          {CONSENT_TYPES.map((type) => {
+            const consent = data.consents.find((c) => c.consentType === type)
+            return (
+              <div key={type} className="document-field-row">
+                <dt>{CONSENT_LABELS[type]}</dt>
+                <dd>
+                  {!consent
+                    ? 'Não concedido'
+                    : consent.revokedAt
+                      ? `Revogado em ${formatDate(consent.revokedAt)}`
+                      : `Concedido em ${formatDate(consent.grantedAt)}`}
+                </dd>
+              </div>
+            )
+          })}
+        </dl>
       </section>
 
       <section className="detail-section">

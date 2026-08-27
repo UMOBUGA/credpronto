@@ -7,6 +7,14 @@ import { http, HttpResponse } from 'msw'
  */
 export const handlers = [
   http.get('/api/auth/session', () => HttpResponse.json({ user: null })),
-  http.get('/api/applications', () => HttpResponse.json([])),
+  http.get('/api/applications', () =>
+    HttpResponse.json({
+      items: [],
+      page: 1,
+      pageSize: 25,
+      hasMore: false,
+      stats: { total: 0, reviewing: 0, approved: 0, closed: 0 },
+    }),
+  ),
   http.get('/api/client/:token', () => HttpResponse.json({ error: 'not_found' }, { status: 404 })),
 ]

@@ -6,6 +6,7 @@ import {
   applicants,
   applications,
   bureauChecks,
+  consentRecords,
   creditDecisions,
   documentExtractions,
   documents,
@@ -165,6 +166,21 @@ async function handleGet(
     .from(loanOffers)
     .where(eq(loanOffers.applicationId, applicationId))
 
+  // Fase 12: o consentimento em si já era gravado desde a Fase 6
+  // (`consent_records`), só nunca tinha aparecido em nenhuma tela do dealer
+  // — vivia só no banco/audit log. `metadataJson` do audit log não ajudaria
+  // aqui mesmo (nunca carrega o quê foi consentido, só nome de campo).
+  const consents = await db
+    .select({
+      id: consentRecords.id,
+      consentType: consentRecords.consentType,
+      grantedAt: consentRecords.grantedAt,
+      revokedAt: consentRecords.revokedAt,
+    })
+    .from(consentRecords)
+    .where(eq(consentRecords.applicationId, applicationId))
+    .orderBy(desc(consentRecords.grantedAt))
+
   const [latestOpenfinanceConsent] = await db
     .select({
       id: openfinanceConsents.id,
@@ -223,6 +239,7 @@ async function handleGet(
         : null,
       latestDecision: latestDecision ?? null,
       offers,
+      consents,
     },
     'no-store',
   )

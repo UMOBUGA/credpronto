@@ -455,6 +455,14 @@ legend {
   border-bottom: none;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

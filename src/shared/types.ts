@@ -132,6 +132,16 @@ export interface ApplicantDetail {
   hasMonthlyIncomeDeclared: boolean
 }
 
+export type ConsentType =
+  'data_processing' | 'bureau_check' | 'openfinance_share' | 'ai_narrative_share'
+
+export interface ConsentRecordSummary {
+  id: string
+  consentType: ConsentType
+  grantedAt: string
+  revokedAt: string | null
+}
+
 export interface AuditLogEntry {
   id: string
   occurredAt: string
@@ -152,4 +162,5 @@ export interface ApplicationDetail extends ApplicationSummary {
   latestOpenfinanceConsent: OpenfinanceConsentSummary | null
   latestDecision: CreditDecisionSummary | null
   offers: LoanOfferSummary[]
+  consents: ConsentRecordSummary[]
 }

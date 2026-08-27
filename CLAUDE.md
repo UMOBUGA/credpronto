@@ -248,6 +248,31 @@ endpoint `POST /api/applications/[id]/link` existe desde a Fase 1, mas nunca foi
 botão); `GET /api/applications` corta em 100 propostas sem paginação; a tela de detalhe não mostra
 quais dos consentimentos granulares (Fase 6/8) o cliente de fato marcou.
 
+## Fase 12 — as 3 lacunas levantadas na revalidação
+
+Fechamento da Rodada 2: as 3 lacunas que a Fase 11 registrou (não eram bugs, só incompleto).
+
+**Reenvio de link do cliente**: `POST /api/applications/[id]/link` existia desde a Fase 1, mas
+nunca tinha sido conectado a um botão — o dealer só conseguia gerar um novo link chamando a API
+diretamente. Botão "Reenviar link" na seção "Link do cliente" de `ApplicationDetailPage.tsx`
+resolve isso; a chamada já invalida a query e o `clientPortalToken` novo aparece sozinho.
+
+**Paginação da fila**: `api/applications/index.ts::handleList` cortava fixo em 100 registros, sem
+nenhum jeito de ver o resto. Agora pagina por offset (`?page=`, 25 por página — simples o
+bastante pro volume de um portfólio, sem cursor). Os chips de estatística no topo da fila
+(`No total`/`Aguardando revisão`/`Aprovadas`/`Encerradas`) **não** são calculados a partir da
+página carregada — um `GROUP BY status` separado no mesmo endpoint garante que ficam corretos
+independente de qual página o dealer está vendo (calculá-los só a partir de `items` da página
+atual ficaria ativamente enganoso assim que a fila passasse de 25 propostas).
+
+**Visibilidade dos consentimentos granulares**: `consent_records` (Fase 6) já gravava
+`data_processing`/`bureau_check`/`ai_narrative_share`/`openfinance_share` com `grantedAt`, mas
+nada na UI do dealer mostrava isso — só existia implicitamente no banco/audit log.
+`api/applications/[id].ts` passa a incluir a lista de consentimentos da proposta (ordenada por
+`grantedAt` desc — o primeiro de cada tipo já é o mais recente, sem precisar de agrupamento
+manual); nova seção "Consentimentos" no detalhe lista os 4 tipos, mostrando "Não concedido"
+quando o titular não marcou aquele item.
+
 ## Convenções herdadas do painel-do-ar
 
 - `@/` aponta para `src/` (dealer + client + shared); `api/` sempre usa import relativo.

@@ -71,6 +71,7 @@ describe('App (dealer)', () => {
           latestOpenfinanceConsent: null,
           latestDecision: null,
           offers: [],
+          consents: [],
         }),
       ),
       http.get('/api/applications/:id/audit-log', () => HttpResponse.json([])),

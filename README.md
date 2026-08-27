@@ -91,3 +91,4 @@ Ver [CLAUDE.md](CLAUDE.md) para o racional completo de arquitetura, convenções
 - ✅ Fase 9 — consulta do valor FIPE já na criação da proposta
 - ✅ Fase 10 — repaginação visual completa (tipografia, paleta, componentes)
 - ✅ Fase 11 — revalidação geral ponta a ponta (ver CLAUDE.md para os achados registrados)
+- ✅ Fase 12 — reenvio de link do cliente, paginação da fila, visibilidade de consentimento
